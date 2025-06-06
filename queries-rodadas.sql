@@ -244,14 +244,14 @@ SELECT users.id, name, car_owner, car_model, car_color, car_plate, ride_id, stat
 JOIN ride_user ON ride_user.user_id = users.id 
 WHERE car_owner = false
 AND (
-	LENGTH(car_model) > 1
-	OR LENGTH(car_color) > 1
-	OR LENGTH(car_plate) > 1
+	LENGTH(car_model) >= 1
+	OR LENGTH(car_color) >= 1
+	OR LENGTH(car_plate) >= 1
 )
 GROUP BY users.id, name, car_owner, car_model, car_color, car_plate, ride_id, status
 ORDER BY users.id
 
--- Sobraram 6 registros de car_owner = false com algum dado do carro
+-- Sobraram 7 registros de car_owner = false com algum dado do carro
 -- 5 só tem a cor
--- 1 só tem uma placa com só 3 letras
+-- 2 só tem uma placa, um com 3 letras e outro com 1 só
 -- Nenhum deles participou do sistema de busca/oferta de caronas
