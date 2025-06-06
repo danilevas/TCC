@@ -238,7 +238,6 @@ AND (
 	OR LENGTH(car_plate) >= 7
 )
 
-
 --Ver os status de caronas dos usuários car_owner = false com qualquer dado do carro
 SELECT users.id, name, car_owner, car_model, car_color, car_plate, ride_id, status FROM users
 JOIN ride_user ON ride_user.user_id = users.id 
