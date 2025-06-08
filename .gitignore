@@ -1,0 +1,4 @@
+ETL/env
+ETL/__pycache__
+ETL/dim_scripts/__pycache__
+ETL/fact_scripts/__pycache__
