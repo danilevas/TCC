@@ -16,7 +16,7 @@ from dim_scripts.dim_status_pedido_etl import etl_dim_status_pedido
 from fact_scripts.fact_carona_etl import etl_fact_carona
 from fact_scripts.fact_interacao_carona_etl import etl_fact_interacao_carona
 
-from utils import connect_to_db, execute_sql
+from utils import connect_to_db, execute_sql, insert_unknown_dim_member
 from sql_queries import ALL_DDL_DROP_QUERIES, ALL_DDL_CREATE_QUERIES, ALL_DDL_DROP_QUERIES_MENOS_TEMPO, ALL_DDL_CREATE_QUERIES_MENOS_TEMPO
 from config import DB_OLTP, DB_DW, LAST_RUN_FILE
 
@@ -89,6 +89,105 @@ def create_dw_tables(conn_dw, recria_dim_time):
     finally:
         cur.close()
 
+# --- NOVA FUNÇÃO PARA INSERIR TODOS OS MEMBROS DESCONHECIDOS ---
+def insert_all_unknown_dim_members(conn_dw):
+    """
+    Insere o membro 'Desconhecido' em todas as tabelas de dimensão.
+    """
+    print("\n--- Inserindo membros 'Desconhecidos' nas Dimensões ---")
+
+    # --- dim_time ---
+    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_time em sql_queries.py
+    dim_time_unknown_values = {
+        'date_sk': -1,
+        'full_date': '1900-01-01',
+        'day_of_week': 0,
+        'day_name': 'Desconhecido',
+        'day_of_month': 0,
+        'month': 0,
+        'month_name': 'Desconhecido',
+        'semester': 0,
+        'year': 0,
+        'hour_sk': -1,
+        'hour_of_day': -1,
+        'minute_of_hour': -1,
+        'time_of_day_bucket': 'Desconhecido'
+    }
+    if not insert_unknown_dim_member(conn_dw, 'dim_time', ['date_sk', 'hour_sk'], dim_time_unknown_values):
+        print("Falha ao inserir membro 'Desconhecido' para dim_time.")
+        return False
+
+    # --- dim_user ---
+    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_user em sql_queries.py
+    dim_user_unknown_values = {
+        'user_sk': -1,
+        'user_id': -1, # Verifique se 'user_id' existe na sua DDL de dim_user
+        'user_name': 'Desconhecido',
+        'profile': 'Desconhecido',
+        'course': 'Desconhecido',
+        'has_car': False,
+        'car_model': 'Desconhecido',
+        'car_color': 'Desconhecido',
+        'car_plate': 'Desconhecido',
+        'is_banned': None,
+        'institution_name': 'Desconhecido'
+    }
+    if not insert_unknown_dim_member(conn_dw, 'dim_user', ['user_sk'], dim_user_unknown_values):
+        print("Falha ao inserir membro 'Desconhecido' para dim_user.")
+        return False
+
+    # --- dim_zone ---
+    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_zone em sql_queries.py
+    dim_zone_unknown_values = {
+        'zone_sk': -1,
+        'zone_id': -1, # Verifique se 'zone_id' existe na sua DDL
+        'name': 'Desconhecido',
+        'color': 'Desconhecido'
+    }
+    if not insert_unknown_dim_member(conn_dw, 'dim_zone', ['zone_sk'], dim_zone_unknown_values):
+        print("Falha ao inserir membro 'Desconhecido' para dim_zone.")
+        return False
+
+    # --- dim_neighborhood ---
+    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_neighborhood em sql_queries.py
+    dim_neighborhood_unknown_values = {
+        'neighborhood_sk': -1,
+        'neighborhood_id': -1, # Verifique se 'neighborhood_id' existe na sua DDL
+        'neighborhood_name': 'Desconhecido',
+        'distance_to_fundao': 0.0, # Ou outro valor numérico padrão
+        'zone_name': 'Desconhecido'
+    }
+    if not insert_unknown_dim_member(conn_dw, 'dim_neighborhood', ['neighborhood_sk'], dim_neighborhood_unknown_values):
+        print("Falha ao inserir membro 'Desconhecido' para dim_neighborhood.")
+        return False
+
+    # --- dim_hub ---
+    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_hub em sql_queries.py
+    dim_hub_unknown_values = {
+        'hub_sk': -1,
+        'hub_id': -1, # Verifique se 'hub_id' existe na sua DDL
+        'hub_name': 'Desconhecido',
+        'campus_name': 'Desconhecido',
+        'campus_color': 'Desconhecido'
+    }
+    if not insert_unknown_dim_member(conn_dw, 'dim_hub', ['hub_sk'], dim_hub_unknown_values):
+        print("Falha ao inserir membro 'Desconhecido' para dim_hub.")
+        return False
+
+    # --- dim_status_pedido ---
+    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_status_pedido em sql_queries.py
+    dim_status_pedido_unknown_values = {
+        'status_sk': -1,
+        'status_name': 'Desconhecido'
+        # Adicione TODAS as outras colunas da sua DDL de dim_status_pedido
+    }
+    if not insert_unknown_dim_member(conn_dw, 'dim_status_pedido', ['status_sk'], dim_status_pedido_unknown_values):
+        print("Falha ao inserir membro 'Desconhecido' para dim_status_pedido.")
+        return False
+
+    print("--- Todos os membros 'Desconhecidos' inseridos com sucesso ---")
+    return True
+
 def main_etl_process(apaga_ultimo_etl_run, recria_dim_time):
     conn_oltp = None
     conn_dw = None
@@ -121,11 +220,20 @@ def main_etl_process(apaga_ultimo_etl_run, recria_dim_time):
             print("ETL abortado devido a falha na criação/recriação das tabelas do DW.")
             return # Sai da função se as tabelas não puderem ser criadas
 
+        # 2. Inserir TODOS os membros "Desconhecidos" nas Dimensões
+        # Chame a nova função que encapsula todas as inserções
+        if not insert_all_unknown_dim_members(conn_dw):
+            print("Abortando ETL devido à falha na inserção de membros 'Desconhecidos'.")
+            # conn_dw.close()
+            return False
+        
+        # conn_dw.close() # Feche a conexão temporária usada apenas para inserções de membros desconhecidos
+
         # Obter a última data de execução para carga incremental
         last_run_date = get_last_etl_run_date()
         current_run_date = datetime.now() # Marcar a hora de início desta execução
 
-        # 2. Executar ETL das Dimensões
+        # 3. Executar ETL das Dimensões
         print("\n--- Iniciando ETL das Dimensões ---")
         # A dim_time geralmente só precisa ser carregada uma vez ou quando estender o período.
         if recria_dim_time:
@@ -138,14 +246,14 @@ def main_etl_process(apaga_ultimo_etl_run, recria_dim_time):
         if not etl_dim_status_pedido(): print("ETL DimStatusPedido falhou.")
         print("--- ETL das Dimensões Concluído ---")
 
-        # 3. Executar ETL dos Fatos (Carga Incremental)
+        # 4. Executar ETL dos Fatos (Carga Incremental)
         print("\n--- Iniciando ETL dos Fatos (Incremental) ---")
         # Passar a data de last_run_date como string para a função
         if not etl_fact_carona(last_run_date.strftime("%Y-%m-%d %H:%M:%S.%f")): print("ETL FatoCarona falhou.")
         if not etl_fact_interacao_carona(last_run_date.strftime("%Y-%m-%d %H:%M:%S.%f")): print("ETL FatoInteracaoCarona falhou.")
         print("--- ETL dos Fatos Concluído ---")
 
-        # 4. Atualizar a marca d'água da última execução
+        # 5. Atualizar a marca d'água da última execução
         set_last_etl_run_date(current_run_date)
         print(f"\nProcesso ETL concluído com sucesso! Última execução registrada em: {current_run_date}")
     
@@ -171,4 +279,4 @@ if __name__ == "__main__":
     main_etl_process(apaga_ultimo_etl_run=True, recria_dim_time=False)
 
     # Para uma carga normal (mantém o last_etl_run.txt e faz carga incremental):
-    # main_etl_process(apaga_ultimo_etl_run=False)
+    # main_etl_process(apaga_ultimo_etl_run=False, recria_dim_time=False)

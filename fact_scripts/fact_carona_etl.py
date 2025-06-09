@@ -163,22 +163,22 @@ def etl_fact_carona(last_etl_run_date_str=None):
         rides_data = rides_data.merge(dim_user_map, left_on='driver_id', right_on='user_id', how='left')
         rides_data.rename(columns={'user_sk': 'driver_user_sk'}, inplace=True)
         # Tratamento de SKs nulas após o merge (se houver IDs que não foram mapeados)
-        # rides_data['driver_user_sk'].fillna(-1, inplace=True) # Assumindo -1 para user_sk desconhecido
+        rides_data['driver_user_sk'].fillna(-1, inplace=True) # Assumindo -1 para user_sk desconhecido
 
         rides_data = rides_data.merge(dim_zone_map, left_on='zone_id', right_on='zone_id', how='left')
         rides_data.rename(columns={'zone_sk': 'zone_sk_mapped'}, inplace=True) # Renomear para evitar conflito
         rides_data['zone_sk'] = rides_data['zone_sk_mapped'] # Atualizar a coluna final
-        # rides_data['zone_sk'].fillna(-1, inplace=True) # Assumindo -1 para zone_sk desconhecida
+        rides_data['zone_sk'].fillna(-1, inplace=True) # Assumindo -1 para zone_sk desconhecida
 
         rides_data = rides_data.merge(dim_neighborhood_map, left_on='neighborhood_id', right_on='neighborhood_id', how='left')
         rides_data.rename(columns={'neighborhood_sk': 'neighborhood_sk_mapped'}, inplace=True)
         rides_data['neighborhood_sk'] = rides_data['neighborhood_sk_mapped']
-        # rides_data['neighborhood_sk'].fillna(-1, inplace=True) # Assumindo -1 para neighborhood_sk desconhecida
+        rides_data['neighborhood_sk'].fillna(-1, inplace=True) # Assumindo -1 para neighborhood_sk desconhecida
 
         rides_data = rides_data.merge(dim_hub_map, left_on='hub_id', right_on='hub_id', how='left')
         rides_data.rename(columns={'hub_sk': 'hub_sk_mapped'}, inplace=True)
         rides_data['hub_sk'] = rides_data['hub_sk_mapped']
-        # rides_data['hub_sk'].fillna(-1, inplace=True) # Assumindo -1 para hub_sk desconhecida
+        rides_data['hub_sk'].fillna(-1, inplace=True) # Assumindo -1 para hub_sk desconhecida
 
         # Limpar colunas temporárias e selecionar as finais
         final_fact_columns = [

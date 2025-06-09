@@ -50,3 +50,32 @@ def get_latest_timestamp(conn_dw, table_name, timestamp_column):
     except psycopg2.Error as e:
         print(f"Erro ao obter o último timestamp para {table_name}: {e}")
         return None
+
+def insert_unknown_dim_member(conn_dw, dim_table_name, sk_column_names, default_values_dict):
+    """
+    Insere um membro 'Desconhecido' em uma tabela de dimensão.
+    sk_column_names: Lista das colunas que formam a chave primária (e.g., ['date_sk', 'hour_sk'])
+    default_values_dict: Dicionário mapeando TODAS as colunas da DDL
+                         para seus valores padrão 'desconhecidos'.
+    """
+    columns = ', '.join(default_values_dict.keys())
+    placeholders = ', '.join(['%s'] * len(default_values_dict))
+    conflict_cols = ', '.join(sk_column_names)
+
+    insert_query = f"""
+        INSERT INTO {dim_table_name} ({columns})
+        VALUES ({placeholders})
+        ON CONFLICT ({conflict_cols}) DO NOTHING;
+    """
+    values = tuple(default_values_dict.values())
+
+    try:
+        with conn_dw.cursor() as cur:
+            cur.execute(insert_query, values)
+        conn_dw.commit()
+        print(f"Membro 'Desconhecido' inserido/garantido em {dim_table_name}.")
+        return True
+    except Exception as e:
+        conn_dw.rollback() # Garante que a transação é revertida em caso de erro
+        print(f"Erro ao inserir membro 'Desconhecido' em {dim_table_name}: {e}")
+        return False
