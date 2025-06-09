@@ -11,12 +11,17 @@ def etl_dim_time():
         return False
 
     try:
-        # Limpar a tabela antes de recarregar (geralmente só na primeira vez)
-        execute_sql(conn_dw, "TRUNCATE TABLE dim_time RESTART IDENTITY CASCADE;")
+        # try:
+        #     print("Tentando truncar dim_time com CASCADE...")
+        #     execute_sql(conn_dw, "TRUNCATE TABLE dim_time RESTART IDENTITY CASCADE;")
+        #     print("dim_time truncada com sucesso (ou já estava vazia).")
+        # except Exception as e:
+        #     print(f"Erro ao truncar dim_time: {e}")
+        #     raise # Re-levanta o erro para que o processo pare aqui
 
-        # Gerar datas para um período razoável (ex: 2020 a 2030)
-        start_date = datetime(2016, 1, 1)
-        end_date = datetime(2026, 12, 31)
+        # Gerar datas para um período razoável (ex: 2016 a 2026)
+        start_date = datetime(2016, 4, 1)
+        end_date = datetime(2025, 12, 31)
         
         dates = pd.date_range(start=start_date, end=end_date, freq='D')
         
@@ -55,6 +60,8 @@ def etl_dim_time():
                                          hour_sk, hour_of_day, minute_of_hour, time_bucket))
         
         print(f"Gerados {len(data_to_load)} registros para dim_time.")
+        print(f"Exemplo: {data_to_load[0]}")
+        print(f"Exemplo: {data_to_load[1]}")
 
         # Inserir usando execute_batch para melhor performance
         from psycopg2.extras import execute_batch
@@ -63,7 +70,8 @@ def etl_dim_time():
             date_sk, full_date, day_of_week, day_name, day_of_month,
             month, month_name, semester, year,
             hour_sk, hour_of_day, minute_of_hour, time_of_day_bucket
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (date_sk, hour_sk) DO NOTHING;
         """
         with conn_dw.cursor() as cur:
             execute_batch(cur, insert_query, data_to_load)

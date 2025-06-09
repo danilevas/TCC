@@ -47,7 +47,7 @@ def etl_fact_interacao_carona(last_etl_run_date_str=None):
 
         # 2. Transformação (Transform)
         ride_users_data['date_sk'] = pd.to_datetime(ride_users_data['created_at']).dt.strftime('%Y%m%d').astype(int)
-        ride_users_data['time_sk'] = pd.to_datetime(ride_users_data['created_at']).dt.strftime('%H%M').astype(int)
+        ride_users_data['hour_sk'] = pd.to_datetime(ride_users_data['created_at']).dt.strftime('%H%M').astype(int)
 
         # Criar as colunas booleanas de status
         ride_users_data['is_driver_interaction'] = (ride_users_data['status'] == 'driver')
@@ -71,13 +71,13 @@ def etl_fact_interacao_carona(last_etl_run_date_str=None):
 
         # Limpar colunas temporárias e selecionar as finais
         final_fact_columns = [
-            'ride_user_id', 'ride_id', 'user_sk', 'date_sk', 'time_sk', 'status_sk',
+            'ride_user_id', 'ride_id', 'user_sk', 'date_sk', 'hour_sk', 'status_sk',
             'is_driver_interaction', 'is_passenger_request', 'request_accepted',
             'request_refused', 'request_pending', 'request_quit',
             'created_at', 'updated_at'
         ]
         # Garantir que as colunas SK não são nulas
-        ride_users_data.dropna(subset=['user_sk', 'date_sk', 'time_sk', 'status_sk'], inplace=True)
+        ride_users_data.dropna(subset=['user_sk', 'date_sk', 'hour_sk', 'status_sk'], inplace=True)
 
         fact_data_to_load = ride_users_data[final_fact_columns]
         fact_data_to_load = fact_data_to_load.replace({pd.NA: None, '': None})
@@ -87,12 +87,12 @@ def etl_fact_interacao_carona(last_etl_run_date_str=None):
 
         insert_or_update_query = """
         INSERT INTO fato_interacao_carona (
-            ride_user_id, ride_id, user_sk, date_sk, time_sk, status_sk,
+            ride_user_id, ride_id, user_sk, date_sk, hour_sk, status_sk,
             is_driver_interaction, is_passenger_request, request_accepted,
             request_refused, request_pending, request_quit,
             created_at, updated_at
         ) VALUES (
-            %(ride_user_id)s, %(ride_id)s, %(user_sk)s, %(date_sk)s, %(time_sk)s, %(status_sk)s,
+            %(ride_user_id)s, %(ride_id)s, %(user_sk)s, %(date_sk)s, %(hour_sk)s, %(status_sk)s,
             %(is_driver_interaction)s, %(is_passenger_request)s, %(request_accepted)s,
             %(request_refused)s, %(request_pending)s, %(request_quit)s,
             %(created_at)s, %(updated_at)s
@@ -100,7 +100,7 @@ def etl_fact_interacao_carona(last_etl_run_date_str=None):
             ride_id = EXCLUDED.ride_id,
             user_sk = EXCLUDED.user_sk,
             date_sk = EXCLUDED.date_sk,
-            time_sk = EXCLUDED.time_sk,
+            hour_sk = EXCLUDED.hour_sk,
             status_sk = EXCLUDED.status_sk,
             is_driver_interaction = EXCLUDED.is_driver_interaction,
             is_passenger_request = EXCLUDED.is_passenger_request,

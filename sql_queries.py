@@ -3,7 +3,7 @@
 # DDLs para as tabelas de dimensão
 CREATE_DIM_TIME_TABLE = """
 CREATE TABLE IF NOT EXISTS dim_time (
-    date_sk INT PRIMARY KEY, -- Esta já é a PK para a granularidade de data
+    date_sk INT NOT NULL,
     full_date DATE NOT NULL,
     day_of_week INT NOT NULL,
     day_name VARCHAR(20) NOT NULL,
@@ -12,13 +12,14 @@ CREATE TABLE IF NOT EXISTS dim_time (
     month_name VARCHAR(20) NOT NULL,
     semester INT NOT NULL,
     year INT NOT NULL,
-    hour_sk INT NOT NULL, -- Chave para a granularidade da hora (formato HHMM)
+    hour_sk INT NOT NULL,
     hour_of_day INT NOT NULL,
     minute_of_hour INT NOT NULL,
     time_of_day_bucket VARCHAR(50) NOT NULL,
     -- Adicione uma restrição de unicidade para a combinação (date_sk, hour_sk)
     -- Isso torna a combinação única, permitindo que seja referenciada por FK
-    UNIQUE (date_sk, hour_sk)
+    PRIMARY KEY (date_sk, hour_sk)
+    -- UNIQUE (date_sk, hour_sk)
 );
 """
 
@@ -84,7 +85,7 @@ CREATE TABLE IF NOT EXISTS fato_carona (
     neighborhood_sk INT NOT NULL,
     hub_sk INT NOT NULL,
     date_sk INT NOT NULL,
-    time_sk INT NOT NULL, -- Para hora e minuto da criação da carona
+    hour_sk INT NOT NULL, -- Para hora e minuto da criação da carona
     is_going_to_campus BOOLEAN,
     slots INT,
     is_routine_ride BOOLEAN,
@@ -94,7 +95,7 @@ CREATE TABLE IF NOT EXISTS fato_carona (
     pending_requests_count INT DEFAULT 0,
     quit_requests_count INT DEFAULT 0,
     messages_count INT DEFAULT 0,
-    ride_description TEXT,
+    description TEXT,
     done BOOLEAN, -- Incluir com cautela se for usar, dada a sua baixa confiabilidade
     created_at TIMESTAMP, -- Para controle do ETL, marca d'água
     updated_at TIMESTAMP, -- Para controle do ETL, marca d'água
@@ -104,7 +105,7 @@ CREATE TABLE IF NOT EXISTS fato_carona (
     FOREIGN KEY (neighborhood_sk) REFERENCES dim_neighborhood(neighborhood_sk),
     FOREIGN KEY (hub_sk) REFERENCES dim_hub(hub_sk),
     -- A FK deve referenciar a combinação única (date_sk, hour_sk)
-    FOREIGN KEY (date_sk, time_sk) REFERENCES dim_time(date_sk, hour_sk)
+    FOREIGN KEY (date_sk, hour_sk) REFERENCES dim_time(date_sk, hour_sk)
 );
 """
 
@@ -115,7 +116,7 @@ CREATE TABLE IF NOT EXISTS fato_interacao_carona (
     ride_id INT NOT NULL, -- ID da carona a que se refere (pode ser FK para fato_carona.ride_id)
     user_sk INT NOT NULL, -- Usuário que fez a interação (motorista ou caronista)
     date_sk INT NOT NULL,
-    time_sk INT NOT NULL, -- Para hora e minuto da interação
+    hour_sk INT NOT NULL, -- Para hora e minuto da interação
     status_sk INT NOT NULL, -- Status final da interação
     is_driver_interaction BOOLEAN,
     is_passenger_request BOOLEAN,
@@ -128,14 +129,54 @@ CREATE TABLE IF NOT EXISTS fato_interacao_carona (
 
     FOREIGN KEY (user_sk) REFERENCES dim_user(user_sk),
     -- A FK deve referenciar a combinação única (date_sk, hour_sk)
-    FOREIGN KEY (date_sk, time_sk) REFERENCES dim_time(date_sk, hour_sk),
+    FOREIGN KEY (date_sk, hour_sk) REFERENCES dim_time(date_sk, hour_sk),
     FOREIGN KEY (status_sk) REFERENCES dim_status_pedido(status_sk)
 );
 """
 
-# Lista de todos os DDLs para fácil execução
-ALL_DDL_QUERIES = [
+# DDL - DROP TABLES (em ordem para evitar problemas de dependência)
+DROP_FACT_CARONA_TABLE = "DROP TABLE IF EXISTS fato_carona CASCADE;"
+DROP_FACT_INTERACAO_CARONA_TABLE = "DROP TABLE IF EXISTS fato_interacao_carona CASCADE;"
+DROP_DIM_TIME_TABLE = "DROP TABLE IF EXISTS dim_time CASCADE;"
+DROP_DIM_USER_TABLE = "DROP TABLE IF EXISTS dim_user CASCADE;"
+DROP_DIM_ZONE_TABLE = "DROP TABLE IF EXISTS dim_zone CASCADE;"
+DROP_DIM_NEIGHBORHOOD_TABLE = "DROP TABLE IF EXISTS dim_neighborhood CASCADE;"
+DROP_DIM_HUB_TABLE = "DROP TABLE IF EXISTS dim_hub CASCADE;"
+DROP_DIM_STATUS_PEDIDO_TABLE = "DROP TABLE IF EXISTS dim_status_pedido CASCADE;"
+
+ALL_DDL_DROP_QUERIES = [
+    DROP_FACT_CARONA_TABLE,
+    DROP_FACT_INTERACAO_CARONA_TABLE,
+    DROP_DIM_TIME_TABLE,
+    DROP_DIM_USER_TABLE,
+    DROP_DIM_ZONE_TABLE,
+    DROP_DIM_NEIGHBORHOOD_TABLE,
+    DROP_DIM_HUB_TABLE,
+    DROP_DIM_STATUS_PEDIDO_TABLE
+]
+
+ALL_DDL_CREATE_QUERIES = [
     CREATE_DIM_TIME_TABLE,
+    CREATE_DIM_USER_TABLE,
+    CREATE_DIM_ZONE_TABLE,
+    CREATE_DIM_NEIGHBORHOOD_TABLE,
+    CREATE_DIM_HUB_TABLE,
+    CREATE_DIM_STATUS_PEDIDO_TABLE,
+    CREATE_FACT_CARONA_TABLE,
+    CREATE_FACT_INTERACAO_CARONA_TABLE
+]
+
+ALL_DDL_DROP_QUERIES_MENOS_TEMPO = [
+    DROP_FACT_CARONA_TABLE,
+    DROP_FACT_INTERACAO_CARONA_TABLE,
+    DROP_DIM_USER_TABLE,
+    DROP_DIM_ZONE_TABLE,
+    DROP_DIM_NEIGHBORHOOD_TABLE,
+    DROP_DIM_HUB_TABLE,
+    DROP_DIM_STATUS_PEDIDO_TABLE
+]
+
+ALL_DDL_CREATE_QUERIES_MENOS_TEMPO = [
     CREATE_DIM_USER_TABLE,
     CREATE_DIM_ZONE_TABLE,
     CREATE_DIM_NEIGHBORHOOD_TABLE,

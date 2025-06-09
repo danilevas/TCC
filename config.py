@@ -17,3 +17,6 @@ DB_DW = {
     'password': 'mcpostgresnosanos80',
     'port': '5432'
 }
+
+# Arquivo para armazenar a última data de execução do ETL para cargas incrementais
+LAST_RUN_FILE = "last_etl_run.txt"
