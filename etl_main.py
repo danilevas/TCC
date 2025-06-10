@@ -125,7 +125,7 @@ def insert_all_unknown_dim_members(conn_dw):
         'user_name': 'Desconhecido',
         'profile': 'Desconhecido',
         'course': 'Desconhecido',
-        'has_car': False,
+        'has_car': None,
         'car_model': 'Desconhecido',
         'car_color': 'Desconhecido',
         'car_plate': 'Desconhecido',
@@ -141,8 +141,8 @@ def insert_all_unknown_dim_members(conn_dw):
     dim_zone_unknown_values = {
         'zone_sk': -1,
         'zone_id': -1, # Verifique se 'zone_id' existe na sua DDL
-        'name': 'Desconhecido',
-        'color': 'Desconhecido'
+        'zone_name': 'Desconhecido',
+        'zone_color': 'Desconhecido'
     }
     if not insert_unknown_dim_member(conn_dw, 'dim_zone', ['zone_sk'], dim_zone_unknown_values):
         print("Falha ao inserir membro 'Desconhecido' para dim_zone.")
@@ -276,7 +276,7 @@ def main_etl_process(apaga_ultimo_etl_run, recria_dim_time):
 if __name__ == "__main__":
     # Para forçar uma carga completa (apaga o last_etl_run.txt e recarrega tudo):
     # Use isso quando quiser ter certeza que tudo está limpo e do zero.
-    main_etl_process(apaga_ultimo_etl_run=True, recria_dim_time=False)
+    main_etl_process(apaga_ultimo_etl_run=True, recria_dim_time=True)
 
     # Para uma carga normal (mantém o last_etl_run.txt e faz carga incremental):
     # main_etl_process(apaga_ultimo_etl_run=False, recria_dim_time=False)
