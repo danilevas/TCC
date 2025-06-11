@@ -19,9 +19,11 @@ def etl_dim_hub():
             h.id,
             h.name,
             c.name AS campus_name,
-            c.color AS campus_color
+            c.color AS campus_color,
+            i.name AS institution_name
         FROM hubs h
-        LEFT JOIN campi c ON h.campus_id = c.id;
+        LEFT JOIN campi c ON h.campus_id = c.id
+        LEFT JOIN institutions i ON c.institution_id = i.id;
         """
         hubs_data = pd.read_sql(query_extract_hubs, conn_oltp)
         print(f"Extraídos {len(hubs_data)} pólos.")
@@ -32,12 +34,13 @@ def etl_dim_hub():
         print("Carregando dados na dim_hub...")
         from psycopg2.extras import execute_batch
         insert_or_update_query = """
-        INSERT INTO dim_hub (hub_id, hub_name, campus_name, campus_color)
-        VALUES (%(hub_id)s, %(hub_name)s, %(campus_name)s, %(campus_color)s)
+        INSERT INTO dim_hub (hub_id, hub_name, campus_name, campus_color, institution_name)
+        VALUES (%(hub_id)s, %(hub_name)s, %(campus_name)s, %(campus_color)s, %(institution_name)s)
         ON CONFLICT (hub_id) DO UPDATE SET
             hub_name = EXCLUDED.hub_name,
             campus_name = EXCLUDED.campus_name,
-            campus_color = EXCLUDED.campus_color;
+            campus_color = EXCLUDED.campus_color,
+            institution_name = EXCLUDED.institution_name;
         """
         data_to_load = hubs_data.to_dict(orient='records')
 

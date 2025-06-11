@@ -42,9 +42,9 @@ def etl_fact_carona(last_etl_run_date_str=None):
             r.done,
             r.week_days, -- Para determinar se é rotina
             r.repeats_until, -- Para determinar se é rotina
-            r.hub AS hub_id,
-            r.myzone AS zone_id, -- Corrigido para 'myzone' conforme seu PDF
-            r.neighborhood AS neighborhood_id,
+            r.hub AS hub_name,
+            r.myzone AS zone_name,
+            r.neighborhood AS neighborhood_name,
             ru_driver.user_id AS driver_id, -- Obter o ID do motorista
             COALESCE(message_counts.num_messages, 0) AS messages_count
         FROM rides r
