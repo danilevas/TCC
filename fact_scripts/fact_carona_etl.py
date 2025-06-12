@@ -28,6 +28,10 @@ def etl_fact_carona(last_etl_run_date_str=None):
 
         print(f"Extraindo dados de caronas (rides) e ride_user. A partir de: {last_etl_run_date}")
 
+
+        # DATE DEVE SER A ÂNCORA TEMPORAL
+
+
         # 1. Extração (Extract) dos dados incrementais do OLTP
         # JOIN com ride_user para garantir que pegamos o driver_id associado à carona
         # e com messages para contar as mensagens (se houver uma tabela de mensagens)
@@ -43,10 +47,8 @@ def etl_fact_carona(last_etl_run_date_str=None):
             r.week_days, -- Para determinar se é rotina
             r.repeats_until, -- Para determinar se é rotina
             r.hub AS hub_name,
-            r.myzone AS zone_name,
             r.neighborhood AS neighborhood_name,
-            ru_driver.user_id AS driver_id, -- Obter o ID do motorista
-            COALESCE(message_counts.num_messages, 0) AS messages_count
+            ru_driver.user_id AS driver_id, -- Obter o ID do motorista    
         FROM rides r
         JOIN ride_user ru_driver ON r.id = ru_driver.ride_id AND ru_driver.status = 'driver'
         LEFT JOIN (
@@ -71,9 +73,8 @@ def etl_fact_carona(last_etl_run_date_str=None):
 
         # 1.5. Tratamento de tipos
 
-        # As colunas 'zone_id', 'neighborhood_id', 'hub_id', 'driver_id'
+        # As colunas 'neighborhood_id', 'hub_id', 'driver_id'
         # vêm da sua query de extração. Converta-as para inteiro.
-        rides_data['zone_id'] = pd.to_numeric(rides_data['zone_id'], errors='coerce').astype('Int64')
         rides_data['neighborhood_id'] = pd.to_numeric(rides_data['neighborhood_id'], errors='coerce').astype('Int64')
         rides_data['hub_id'] = pd.to_numeric(rides_data['hub_id'], errors='coerce').astype('Int64')
         rides_data['driver_id'] = pd.to_numeric(rides_data['driver_id'], errors='coerce').astype('Int64')
@@ -150,13 +151,11 @@ def etl_fact_carona(last_etl_run_date_str=None):
         # Obter chaves substitutas das dimensões já carregadas
         # Otimização: Carregar mapas de SKs uma vez
         dim_user_map = pd.read_sql("SELECT user_id, user_sk FROM dim_user;", conn_dw)
-        dim_zone_map = pd.read_sql("SELECT zone_id, zone_sk FROM dim_zone;", conn_dw)
         dim_neighborhood_map = pd.read_sql("SELECT neighborhood_id, neighborhood_sk FROM dim_neighborhood;", conn_dw)
         dim_hub_map = pd.read_sql("SELECT hub_id, hub_sk FROM dim_hub;", conn_dw)
 
         # CONVERSÃO DE TIPO AQUI para os mapas das dimensões
         dim_user_map['user_id'] = pd.to_numeric(dim_user_map['user_id'], errors='coerce').astype('Int64')
-        dim_zone_map['zone_id'] = pd.to_numeric(dim_zone_map['zone_id'], errors='coerce').astype('Int64')
         dim_neighborhood_map['neighborhood_id'] = pd.to_numeric(dim_neighborhood_map['neighborhood_id'], errors='coerce').astype('Int64')
         dim_hub_map['hub_id'] = pd.to_numeric(dim_hub_map['hub_id'], errors='coerce').astype('Int64')
 
@@ -164,11 +163,6 @@ def etl_fact_carona(last_etl_run_date_str=None):
         rides_data.rename(columns={'user_sk': 'driver_user_sk'}, inplace=True)
         # Tratamento de SKs nulas após o merge (se houver IDs que não foram mapeados)
         rides_data['driver_user_sk'].fillna(-1, inplace=True) # Assumindo -1 para user_sk desconhecido
-
-        rides_data = rides_data.merge(dim_zone_map, left_on='zone_id', right_on='zone_id', how='left')
-        rides_data.rename(columns={'zone_sk': 'zone_sk_mapped'}, inplace=True) # Renomear para evitar conflito
-        rides_data['zone_sk'] = rides_data['zone_sk_mapped'] # Atualizar a coluna final
-        rides_data['zone_sk'].fillna(-1, inplace=True) # Assumindo -1 para zone_sk desconhecida
 
         rides_data = rides_data.merge(dim_neighborhood_map, left_on='neighborhood_id', right_on='neighborhood_id', how='left')
         rides_data.rename(columns={'neighborhood_sk': 'neighborhood_sk_mapped'}, inplace=True)
@@ -182,14 +176,14 @@ def etl_fact_carona(last_etl_run_date_str=None):
 
         # Limpar colunas temporárias e selecionar as finais
         final_fact_columns = [
-            'ride_id', 'driver_user_sk', 'zone_sk', 'neighborhood_sk', 'hub_sk',
+            'ride_id', 'driver_user_sk', 'neighborhood_sk', 'hub_sk',
             'date_sk', 'hour_sk', 'is_going_to_campus', 'slots', 'is_routine_ride',
             'requests_count', 'accepted_requests_count', 'refused_requests_count',
             'pending_requests_count', 'quit_requests_count', 'messages_count',
             'description', 'created_at', 'updated_at'
         ]
         # Garantir que as colunas SK não são nulas se as FKs não são opcionais
-        rides_data.dropna(subset=['driver_user_sk', 'zone_sk', 'neighborhood_sk', 'hub_sk', 'date_sk', 'hour_sk'], inplace=True)
+        rides_data.dropna(subset=['driver_user_sk', 'neighborhood_sk', 'hub_sk', 'date_sk', 'hour_sk'], inplace=True)
         
         fact_data_to_load = rides_data[final_fact_columns]
         fact_data_to_load = fact_data_to_load.replace({pd.NA: None, '': None})
@@ -199,20 +193,19 @@ def etl_fact_carona(last_etl_run_date_str=None):
         
         insert_or_update_query = """
         INSERT INTO fato_carona (
-            ride_id, driver_user_sk, zone_sk, neighborhood_sk, hub_sk,
+            ride_id, driver_user_sk, neighborhood_sk, hub_sk,
             date_sk, hour_sk, is_going_to_campus, slots, is_routine_ride,
             requests_count, accepted_requests_count, refused_requests_count,
             pending_requests_count, quit_requests_count, messages_count, description,
             created_at, updated_at
         ) VALUES (
-            %(ride_id)s, %(driver_user_sk)s, %(zone_sk)s, %(neighborhood_sk)s, %(hub_sk)s,
+            %(ride_id)s, %(driver_user_sk)s, %(neighborhood_sk)s, %(hub_sk)s,
             %(date_sk)s, %(hour_sk)s, %(is_going_to_campus)s, %(slots)s, %(is_routine_ride)s,
             %(requests_count)s, %(accepted_requests_count)s, %(refused_requests_count)s,
             %(pending_requests_count)s, %(quit_requests_count)s, %(messages_count)s, %(description)s,
             %(created_at)s, %(updated_at)s
         ) ON CONFLICT (ride_id) DO UPDATE SET
             driver_user_sk = EXCLUDED.driver_user_sk,
-            zone_sk = EXCLUDED.zone_sk,
             neighborhood_sk = EXCLUDED.neighborhood_sk,
             hub_sk = EXCLUDED.hub_sk,
             date_sk = EXCLUDED.date_sk,

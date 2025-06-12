@@ -12,15 +12,22 @@ def etl_dim_hub():
         return False
 
     try:
-        print("Extraindo dados de hubs e campi...")
+        print("Extraindo dados de hubs, campi e institutions...")
         # Inclui o nome e a cor do campus para desnormalizar
         query_extract_hubs = """
         SELECT
             h.id,
             h.name,
+            h.center,
+            h.campus_id,
             c.name AS campus_name,
             c.color AS campus_color,
-            i.name AS institution_name
+            c.created_at AS campus_created_at,
+            c.updated_at AS campus_updated_at,
+            c.institution_id,
+            i.name AS institution_name,
+            i.created_at AS institution_created_at,
+            i.updated_at AS institution_updated_at
         FROM hubs h
         LEFT JOIN campi c ON h.campus_id = c.id
         LEFT JOIN institutions i ON c.institution_id = i.id;

@@ -16,16 +16,27 @@ def etl_dim_user():
         print("Extraindo dados de users e institutions...")
         query_extract_users = """
         SELECT
-            u.id,
-            u.name,
+            u.id AS user_id,
+            u.name AS user_name,
             u.profile,
             u.course,
-            u.car_owner,
+            u.phone_number,
+            u.email,
+            u.car_owner AS has_car,
             u.car_model,
             u.car_color,
             u.car_plate,
-            u.banned,
-            i.name as institution_name
+            u.created_at,
+            u.updated_at,
+            u.location AS user_location,
+            u.deleted_at,
+            u.id_ufrj AS cpf,
+            u.app_platform,
+            u.app_version,
+            u.banned AS is_banned,
+            i.id AS institution_id,      
+            i.name AS institution_name,  
+            i.color AS institution_color
         FROM users u
         LEFT JOIN institutions i ON u.institution_id = i.id;
         """
@@ -33,12 +44,6 @@ def etl_dim_user():
         print(f"Extraídos {len(users_data)} usuários.")
 
         # 2. Transformação (Transform)
-        users_data.rename(columns={
-            'id': 'user_id',
-            'name': 'user_name',
-            'car_owner': 'has_car',
-            'banned': 'is_banned'
-        }, inplace=True)
 
         # Tratar valores nulos ou inconsistências (ex: car_model se has_car é falso)
         users_data['car_model'] = users_data.apply(lambda row: row['car_model'] if row['has_car'] else None, axis=1)

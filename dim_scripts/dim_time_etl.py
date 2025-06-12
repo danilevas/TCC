@@ -11,14 +11,6 @@ def etl_dim_time():
         return False
 
     try:
-        # try:
-        #     print("Tentando truncar dim_time com CASCADE...")
-        #     execute_sql(conn_dw, "TRUNCATE TABLE dim_time RESTART IDENTITY CASCADE;")
-        #     print("dim_time truncada com sucesso (ou já estava vazia).")
-        # except Exception as e:
-        #     print(f"Erro ao truncar dim_time: {e}")
-        #     raise # Re-levanta o erro para que o processo pare aqui
-
         # Gerar datas para um período razoável (ex: 2016 a 2026)
         start_date = datetime(2016, 4, 1)
         end_date = datetime(2025, 12, 31)
