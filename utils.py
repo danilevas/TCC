@@ -1,6 +1,7 @@
 # utils.py
 import psycopg2
-from config import DB_OLTP, DB_DW
+# from config import DB_OLTP, DB_DW
+from datetime import datetime, timedelta
 
 def connect_to_db(db_config):
     """
@@ -50,6 +51,20 @@ def get_latest_timestamp(conn_dw, table_name, timestamp_column):
     except psycopg2.Error as e:
         print(f"Erro ao obter o último timestamp para {table_name}: {e}")
         return None
+
+def get_last_etl_run_date_se_houver(conn_dw, last_etl_run_date_str):
+    # Se last_etl_run_date_str não for fornecido, tenta buscar no DW
+    if not last_etl_run_date_str:
+        last_etl_run_date = get_latest_timestamp(conn_dw, 'fato_carona', 'updated_at')
+        if last_etl_run_date is None:
+            last_etl_run_date = datetime(2000, 1, 1) # Data bem antiga para primeira carga
+        else:
+            # Adicionar um pequeno buffer para pegar alterações que podem ter ocorrido na borda
+            last_etl_run_date -= timedelta(minutes=5)
+    else:
+        last_etl_run_date = datetime.strptime(last_etl_run_date_str, "%Y-%m-%d %H:%M:%S.%f")
+    
+    return last_etl_run_date
 
 def insert_unknown_dim_member(conn_dw, dim_table_name, sk_column_names, default_values_dict):
     """

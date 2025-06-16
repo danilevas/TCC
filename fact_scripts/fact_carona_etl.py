@@ -1,8 +1,7 @@
 # fact_scripts/fact_carona_etl.py
 import pandas as pd
 from config import DB_OLTP, DB_DW
-from utils import connect_to_db, execute_sql, get_latest_timestamp
-from datetime import datetime, timedelta
+from utils import connect_to_db, get_last_etl_run_date_se_houver
 from psycopg2.extras import execute_batch
 
 def etl_fact_carona(last_etl_run_date_str=None):
@@ -15,22 +14,8 @@ def etl_fact_carona(last_etl_run_date_str=None):
 
     try:
         # Obter o último timestamp do DW para carga incremental
-        # Se last_etl_run_date_str não for fornecido, tenta buscar no DW
-        if not last_etl_run_date_str:
-            last_etl_run_date = get_latest_timestamp(conn_dw, 'fato_carona', 'updated_at')
-            if last_etl_run_date is None:
-                last_etl_run_date = datetime(2000, 1, 1) # Data bem antiga para primeira carga
-            else:
-                # Adicionar um pequeno buffer para pegar alterações que podem ter ocorrido na borda
-                last_etl_run_date -= timedelta(minutes=5)
-        else:
-            last_etl_run_date = datetime.strptime(last_etl_run_date_str, "%Y-%m-%d %H:%M:%S.%f")
-
+        last_etl_run_date = get_last_etl_run_date_se_houver(conn_dw, last_etl_run_date_str)
         print(f"Extraindo dados de caronas (rides) e ride_user. A partir de: {last_etl_run_date}")
-
-
-        # DATE DEVE SER A ÂNCORA TEMPORAL
-
 
         # 1. Extração (Extract) dos dados incrementais do OLTP
         # JOIN com ride_user para garantir que pegamos o driver_id associado à carona
@@ -38,18 +23,20 @@ def etl_fact_carona(last_etl_run_date_str=None):
         query_extract_rides = f"""
         SELECT
             r.id AS ride_id,
+            r.neighborhood AS neighborhood_name, -- Temos que pegar o neighborhood_id  
+            r.going AS is_going_to_campus, -- Renomear para clareza
+            r.routine_id,
+            r.hub AS hub_name, -- Temos que pegar o hub_id
+            r.slots,
             r.created_at,
             r.updated_at,
-            r.slots,
-            r.description,
-            r.going AS is_going_to_campus, -- Renomear para clareza
+            r.week_days,
+            r.repeats_until,
             r.done,
-            r.week_days, -- Para determinar se é rotina
-            r.repeats_until, -- Para determinar se é rotina
-            r.hub AS hub_name,
-            r.neighborhood AS neighborhood_name,
-            ru_driver.user_id AS driver_id, -- Obter o ID do motorista    
-        FROM rides r
+            r.deleted_at,
+            r.date,
+            ru_driver.user_id AS driver_id
+        FROM rides r 
         JOIN ride_user ru_driver ON r.id = ru_driver.ride_id AND ru_driver.status = 'driver'
         LEFT JOIN (
             SELECT ride_id, COUNT(*) AS num_messages
@@ -72,20 +59,13 @@ def etl_fact_carona(last_etl_run_date_str=None):
         ride_users_agg_data = pd.read_sql(query_extract_ride_users_for_aggregation, conn_oltp)
 
         # 1.5. Tratamento de tipos
-
-        # As colunas 'neighborhood_id', 'hub_id', 'driver_id'
-        # vêm da sua query de extração. Converta-as para inteiro.
-        rides_data['neighborhood_id'] = pd.to_numeric(rides_data['neighborhood_id'], errors='coerce').astype('Int64')
-        rides_data['hub_id'] = pd.to_numeric(rides_data['hub_id'], errors='coerce').astype('Int64')
-        rides_data['driver_id'] = pd.to_numeric(rides_data['driver_id'], errors='coerce').astype('Int64')
+        # Convertendo as colunas numéricas que são chaves
+        colunas_numericas = ['ride_id', 'driver_id']
+        for coluna in colunas_numericas:
+            rides_data[coluna] = pd.to_numeric(rides_data[coluna], errors='coerce').astype('Int64')
         
-        # Opcional: Se 'slots' puder vir como float e você precisa de int, converta aqui
-        rides_data['slots'] = pd.to_numeric(rides_data['slots'], errors='coerce').astype('Int64').fillna(0) # Assumindo 0 para nulos
-        # E para 'is_going_to_campus' (booleano)
+        # Convertendo as colunas booleanas
         rides_data['is_going_to_campus'] = rides_data['is_going_to_campus'].fillna(False).astype(bool)
-
-        # CONVERSÃO DE TIPO AQUI para ride_users_agg_data se houver IDs para merge
-        ride_users_agg_data['ride_id'] = pd.to_numeric(ride_users_agg_data['ride_id'], errors='coerce').astype('Int64')
 
         # 2. Transformação (Transform)
         print(f"Extraídas {len(rides_data)} caronas para processamento incremental.")
@@ -94,14 +74,14 @@ def etl_fact_carona(last_etl_run_date_str=None):
             print("Nenhum dado novo ou atualizado para processar na fato_carona.")
             return True # Não há dados para carregar, mas não é um erro
 
-        # Gerar chaves de data/hora a partir das datas de criação (carona_created_at)
-        rides_data['date_sk'] = pd.to_datetime(rides_data['created_at']).dt.strftime('%Y%m%d').astype(int)
-        rides_data['hour_sk'] = pd.to_datetime(rides_data['created_at']).dt.strftime('%H%M').astype(int)
+        # Gerar chaves de data/hora a partir das datas em que a carona estava marcada para ocorrer (da coluna date)
+        rides_data['date_sk'] = pd.to_datetime(rides_data['date']).dt.strftime('%Y%m%d').astype(int)
+        rides_data['hour_sk'] = pd.to_datetime(rides_data['date']).dt.strftime('%H%M').astype(int)
 
         # Determinar se é carona de rotina
         rides_data['is_routine_ride'] = (rides_data['week_days'].notna()) | (rides_data['repeats_until'].notna())
 
-        # Agregar métricas de requests
+        # Agregar métricas de pedidos
         # Usar pivot_table para garantir que todos os status possíveis são colunas
         if not ride_users_agg_data.empty:
             requests_summary = ride_users_agg_data.pivot_table(
@@ -130,7 +110,7 @@ def etl_fact_carona(last_etl_run_date_str=None):
             rides_data['accepted_requests_count'] = 0
             rides_data['refused_requests_count'] = 0
             rides_data['quit_requests_count'] = 0
-            rides_data['driver_creation_events_agg'] = 0 # Adicione esta também
+            rides_data['driver_creation_events_agg'] = 0
 
         rides_data['requests_count'] = rides_data[['pending_requests_count', 'accepted_requests_count', 'refused_requests_count', 'quit_requests_count']].sum(axis=1)
 
@@ -139,50 +119,53 @@ def etl_fact_carona(last_etl_run_date_str=None):
             'pending_requests_count': 0, 'accepted_requests_count': 0,
             'refused_requests_count': 0, 'quit_requests_count': 0,
             'requests_count': 0, 'messages_count': 0,
-            'description': '',
             'is_going_to_campus': False, 'slots': 0, 'is_routine_ride': False,
             'driver_creation_events_agg': 0
         }, inplace=True)
         
-        # Converter booleanos para Python booleano (True/False)
-        rides_data['is_going_to_campus'] = rides_data['is_going_to_campus'].astype(bool)
-        rides_data['is_routine_ride'] = rides_data['is_routine_ride'].astype(bool)
+        # Converter a coluna is_routine_ride para Python booleano (True/False)
+        rides_data['is_routine_ride'] = rides_data['is_routine_ride'].fillna(False).astype(bool)
 
         # Obter chaves substitutas das dimensões já carregadas
         # Otimização: Carregar mapas de SKs uma vez
         dim_user_map = pd.read_sql("SELECT user_id, user_sk FROM dim_user;", conn_dw)
-        dim_neighborhood_map = pd.read_sql("SELECT neighborhood_id, neighborhood_sk FROM dim_neighborhood;", conn_dw)
-        dim_hub_map = pd.read_sql("SELECT hub_id, hub_sk FROM dim_hub;", conn_dw)
+        dim_neighborhood_map = pd.read_sql("SELECT neighborhood_name, neighborhood_sk FROM dim_neighborhood;", conn_dw)
+        dim_hub_map = pd.read_sql("SELECT hub_name, hub_sk FROM dim_hub;", conn_dw)
 
-        # CONVERSÃO DE TIPO AQUI para os mapas das dimensões
+        # Convertendo para numéricos os mapas das dimensões
         dim_user_map['user_id'] = pd.to_numeric(dim_user_map['user_id'], errors='coerce').astype('Int64')
         dim_neighborhood_map['neighborhood_id'] = pd.to_numeric(dim_neighborhood_map['neighborhood_id'], errors='coerce').astype('Int64')
         dim_hub_map['hub_id'] = pd.to_numeric(dim_hub_map['hub_id'], errors='coerce').astype('Int64')
 
+        # Fazendo o merge com dim_user_map
         rides_data = rides_data.merge(dim_user_map, left_on='driver_id', right_on='user_id', how='left')
         rides_data.rename(columns={'user_sk': 'driver_user_sk'}, inplace=True)
-        # Tratamento de SKs nulas após o merge (se houver IDs que não foram mapeados)
-        rides_data['driver_user_sk'].fillna(-1, inplace=True) # Assumindo -1 para user_sk desconhecido
 
-        rides_data = rides_data.merge(dim_neighborhood_map, left_on='neighborhood_id', right_on='neighborhood_id', how='left')
+        # Fazendo o merge com dim_neighborhood_map
+        rides_data = rides_data.merge(dim_neighborhood_map, left_on='neighborhood_name', right_on='neighborhood_name', how='left')
         rides_data.rename(columns={'neighborhood_sk': 'neighborhood_sk_mapped'}, inplace=True)
         rides_data['neighborhood_sk'] = rides_data['neighborhood_sk_mapped']
-        rides_data['neighborhood_sk'].fillna(-1, inplace=True) # Assumindo -1 para neighborhood_sk desconhecida
 
-        rides_data = rides_data.merge(dim_hub_map, left_on='hub_id', right_on='hub_id', how='left')
+        # Fazendo o merge com dim_hub_map
+        rides_data = rides_data.merge(dim_hub_map, left_on='hub_name', right_on='hub_name', how='left')
         rides_data.rename(columns={'hub_sk': 'hub_sk_mapped'}, inplace=True)
         rides_data['hub_sk'] = rides_data['hub_sk_mapped']
-        rides_data['hub_sk'].fillna(-1, inplace=True) # Assumindo -1 para hub_sk desconhecida
+
+        # Tratamento de SKs nulas após o merge (se houver IDs que não foram mapeados - assumindo -1 para sk desconhecido)
+        rides_data['driver_user_sk'].fillna(-1, inplace=True)
+        rides_data['neighborhood_sk'].fillna(-1, inplace=True)
+        rides_data['hub_sk'].fillna(-1, inplace=True)
 
         # Limpar colunas temporárias e selecionar as finais
         final_fact_columns = [
-            'ride_id', 'driver_user_sk', 'neighborhood_sk', 'hub_sk',
-            'date_sk', 'hour_sk', 'is_going_to_campus', 'slots', 'is_routine_ride',
+            'ride_id', 'driver_user_sk', 'neighborhood_sk', 'hub_sk', 'date_sk', 'hour_sk',
+            'is_going_to_campus', 'is_routine_ride', 'routine_id', 'slots',
+            'week_days', 'repeats_until', 'done',
             'requests_count', 'accepted_requests_count', 'refused_requests_count',
             'pending_requests_count', 'quit_requests_count', 'messages_count',
-            'description', 'created_at', 'updated_at'
+            'created_at', 'updated_at', 'deleted_at'
         ]
-        # Garantir que as colunas SK não são nulas se as FKs não são opcionais
+        # Garantir que as colunas SK não são nulas se as FKs não são opcionais (refletir se deixamos assim, mas acho que sim)
         rides_data.dropna(subset=['driver_user_sk', 'neighborhood_sk', 'hub_sk', 'date_sk', 'hour_sk'], inplace=True)
         
         fact_data_to_load = rides_data[final_fact_columns]
@@ -193,17 +176,19 @@ def etl_fact_carona(last_etl_run_date_str=None):
         
         insert_or_update_query = """
         INSERT INTO fato_carona (
-            ride_id, driver_user_sk, neighborhood_sk, hub_sk,
-            date_sk, hour_sk, is_going_to_campus, slots, is_routine_ride,
+            ride_id, driver_user_sk, neighborhood_sk, hub_sk, date_sk, hour_sk,
+            is_going_to_campus, is_routine_ride, routine_id, slots,
+            week_days, repeats_until, done,
             requests_count, accepted_requests_count, refused_requests_count,
-            pending_requests_count, quit_requests_count, messages_count, description,
-            created_at, updated_at
+            pending_requests_count, quit_requests_count, messages_count,
+            created_at, updated_at, deleted_at
         ) VALUES (
-            %(ride_id)s, %(driver_user_sk)s, %(neighborhood_sk)s, %(hub_sk)s,
-            %(date_sk)s, %(hour_sk)s, %(is_going_to_campus)s, %(slots)s, %(is_routine_ride)s,
+            %(ride_id)s, %(driver_user_sk)s, %(neighborhood_sk)s, %(hub_sk)s, %(date_sk)s, %(hour_sk)s,
+            %(is_going_to_campus)s, %(is_routine_ride)s, %(routine_id)s, %(slots)s,
+            %(week_days)s, %(repeats_until)s, %(done)s,
             %(requests_count)s, %(accepted_requests_count)s, %(refused_requests_count)s,
-            %(pending_requests_count)s, %(quit_requests_count)s, %(messages_count)s, %(description)s,
-            %(created_at)s, %(updated_at)s
+            %(pending_requests_count)s, %(quit_requests_count)s, %(messages_count)s
+            %(created_at)s, %(updated_at)s, %(deleted_at)s
         ) ON CONFLICT (ride_id) DO UPDATE SET
             driver_user_sk = EXCLUDED.driver_user_sk,
             neighborhood_sk = EXCLUDED.neighborhood_sk,
@@ -211,16 +196,20 @@ def etl_fact_carona(last_etl_run_date_str=None):
             date_sk = EXCLUDED.date_sk,
             hour_sk = EXCLUDED.hour_sk,
             is_going_to_campus = EXCLUDED.is_going_to_campus,
-            slots = EXCLUDED.slots,
             is_routine_ride = EXCLUDED.is_routine_ride,
+            routine_id = EXCLUDED.routine_id,
+            slots = EXCLUDED.slots,
+            week_days = EXCLUDED.week_days,
+            repeats_until = EXCLUDED.repeats_until,
+            done = EXCLUDED.done,
             requests_count = EXCLUDED.requests_count,
             accepted_requests_count = EXCLUDED.accepted_requests_count,
             refused_requests_count = EXCLUDED.refused_requests_count,
             pending_requests_count = EXCLUDED.pending_requests_count,
             quit_requests_count = EXCLUDED.quit_requests_count,
             messages_count = EXCLUDED.messages_count,
-            description = EXCLUDED.description,
             updated_at = EXCLUDED.updated_at; -- Atualizar o updated_at para a marca d'água
+            deleted_at = EXCLUDED.deleted_at; -- Atualizar o deleted_at para a marca d'água, se a carona foi deletada de lá pra cá
         """
         data_to_load_dicts = fact_data_to_load.to_dict(orient='records')
 

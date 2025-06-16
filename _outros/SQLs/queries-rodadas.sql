@@ -254,3 +254,22 @@ ORDER BY users.id
 -- 5 só tem a cor
 -- 2 só tem uma placa, um com 3 letras e outro com 1 só
 -- Nenhum deles participou do sistema de busca/oferta de caronas
+
+-- Ver valores em users.location que não estão em neighborhoods
+SELECT u.location, COUNT(*) AS contagem FROM users u
+FULL JOIN neighborhoods n ON u.location = n.name
+WHERE u.location NOT IN (
+	SELECT name FROM neighborhoods
+)
+AND u.location IS NOT NULL
+AND u.location != ''
+GROUP BY u.location
+ORDER BY contagem DESC
+
+-- Ver cpfs que não tem 11 dígitos, ou que não são só números
+SELECT id, name, id_ufrj FROM users
+WHERE LENGTH(id_ufrj) NOT IN (11)
+-- WHERE id_ufrj !~ '^[0-9]+$'
+
+-- Basicamente aqui temos 43 códigos de gringos que tem entre 8 e 10 caracteres, números e letras,
+-- todos começando com "E", e 1 CPF de um cara que só tem 10 dígitos

@@ -1,7 +1,7 @@
 # dim_scripts/dim_neighborhood_etl.py
 import pandas as pd
 from config import DB_OLTP, DB_DW
-from utils import connect_to_db, execute_sql
+from utils import connect_to_db
 
 def etl_dim_neighborhood():
     conn_oltp = connect_to_db(DB_OLTP)

@@ -1,7 +1,7 @@
 # dim_scripts/dim_user_etl.py
 import pandas as pd
 from config import DB_OLTP, DB_DW
-from utils import connect_to_db, execute_sql
+from utils import connect_to_db
 
 def etl_dim_user():
     conn_oltp = connect_to_db(DB_OLTP)
@@ -26,17 +26,17 @@ def etl_dim_user():
             u.car_model,
             u.car_color,
             u.car_plate,
-            u.created_at,
-            u.updated_at,
             u.location AS user_location,
-            u.deleted_at,
             u.id_ufrj AS cpf,
             u.app_platform,
             u.app_version,
             u.banned AS is_banned,
             i.id AS institution_id,      
             i.name AS institution_name,  
-            i.color AS institution_color
+            i.color AS institution_color,
+            u.created_at,
+            u.updated_at,
+            u.deleted_at
         FROM users u
         LEFT JOIN institutions i ON u.institution_id = i.id;
         """
@@ -61,21 +61,40 @@ def etl_dim_user():
         from psycopg2.extras import execute_batch
         insert_or_update_query = """
         INSERT INTO dim_user (
-            user_id, user_name, profile, course, has_car,
-            car_model, car_color, car_plate, is_banned, institution_name
+            user_id, user_name, profile, course, 
+            phone_number, email, has_car,
+            car_model, car_color, car_plate,
+            user_location, cpf, app_platform, app_version,
+            is_banned, institution_id, institution_name, institution_color,
+            created_at, updated_at, deleted_at
         ) VALUES (
-            %(user_id)s, %(user_name)s, %(profile)s, %(course)s, %(has_car)s,
-            %(car_model)s, %(car_color)s, %(car_plate)s, %(is_banned)s, %(institution_name)s
+            %(user_id)s, %(user_name)s, %(profile)s, %(course)s,
+            %(phone_number)s, %(email)s, %(has_car)s,
+            %(car_model)s, %(car_color)s, %(car_plate)s,
+            %(user_location)s, %(cpf)s, %(app_platform)s, %(app_version)s,
+            %(is_banned)s, %(institution_id)s, %(institution_name)s, %(institution_color)s,
+            %(created_at)s, %(updated_at)s, %(deleted_at)s
         ) ON CONFLICT (user_id) DO UPDATE SET
             user_name = EXCLUDED.user_name,
             profile = EXCLUDED.profile,
             course = EXCLUDED.course,
+            phone_number = EXCLUDED.phone_number,
+            email = EXCLUDED.email,
             has_car = EXCLUDED.has_car,
             car_model = EXCLUDED.car_model,
             car_color = EXCLUDED.car_color,
             car_plate = EXCLUDED.car_plate,
+            user_location = EXCLUDED.user_location,
+            cpf = EXCLUDED.cpf,
+            app_platform = EXCLUDED.app_platform,
+            app_version = EXCLUDED.app_version,
             is_banned = EXCLUDED.is_banned,
+            institution_id = EXCLUDED.institution_id;
             institution_name = EXCLUDED.institution_name;
+            institution_color = EXCLUDED.institution_color;
+            created_at = EXCLUDED.created_at;
+            updated_at = EXCLUDED.updated_at;
+            deleted_at = EXCLUDED.deleted_at;
         """
         
         # Converter DataFrame para lista de dicionários para execute_batch
