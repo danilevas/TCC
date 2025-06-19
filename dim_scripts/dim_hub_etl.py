@@ -1,7 +1,7 @@
 # dim_scripts/dim_hub_etl.py
 import pandas as pd
 from config import DB_OLTP, DB_DW
-from utils import connect_to_db, execute_sql
+from utils import connect_to_db
 
 def etl_dim_hub():
     conn_oltp = connect_to_db(DB_OLTP)
@@ -16,8 +16,8 @@ def etl_dim_hub():
         # Inclui o nome e a cor do campus para desnormalizar
         query_extract_hubs = """
         SELECT
-            h.id,
-            h.name,
+            h.id AS hub_id,
+            h.name AS hub_name,
             h.center,
             h.campus_id,
             c.name AS campus_name,
@@ -41,13 +41,28 @@ def etl_dim_hub():
         print("Carregando dados na dim_hub...")
         from psycopg2.extras import execute_batch
         insert_or_update_query = """
-        INSERT INTO dim_hub (hub_id, hub_name, campus_name, campus_color, institution_name)
-        VALUES (%(hub_id)s, %(hub_name)s, %(campus_name)s, %(campus_color)s, %(institution_name)s)
+        INSERT INTO dim_hub (
+            hub_id, hub_name, center,
+            campus_id, campus_name, campus_color, campus_created_at, campus_updated_at,
+            institution_id, institution_name, institution_created_at, institution_updated_at
+        ) VALUES (
+            %(hub_id)s, %(hub_name)s, %(center)s
+            %(campus_id)s, %(campus_name)s, %(campus_color)s, %(campus_created_at)s, %(campus_updated_at)s,
+             %(institution_id)s, %(institution_name)s, %(institution_created_at)s, %(institution_updated_at)s
+        )
         ON CONFLICT (hub_id) DO UPDATE SET
+            hub_id = EXCLUDED.hub_id,
             hub_name = EXCLUDED.hub_name,
+            center = EXCLUDED.center,
+            campus_id = EXCLUDED.campus_id,
             campus_name = EXCLUDED.campus_name,
             campus_color = EXCLUDED.campus_color,
-            institution_name = EXCLUDED.institution_name;
+            campus_created_at = EXCLUDED.campus_created_at,
+            campus_updated_at = EXCLUDED.campus_updated_at,
+            institution_id = EXCLUDED.institution_id,
+            institution_name = EXCLUDED.institution_name,
+            institution_created_at = EXCLUDED.institution_created_at,
+            institution_updated_at = EXCLUDED.institution_updated_at;
         """
         data_to_load = hubs_data.to_dict(orient='records')
 

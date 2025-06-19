@@ -43,7 +43,7 @@ def etl_fact_carona(last_etl_run_date_str=None):
             FROM messages
             GROUP BY ride_id
         ) AS message_counts ON r.id = message_counts.ride_id
-        WHERE r.created_at >= '{last_etl_run_date}' OR r.updated_at >= '{last_etl_run_date}';
+        WHERE r.created_at >= '{last_etl_run_date}' OR r.updated_at >= '{last_etl_run_date}' OR r.deleted_at >= '{last_etl_run_date}';
         """
         rides_data = pd.read_sql(query_extract_rides, conn_oltp)
 

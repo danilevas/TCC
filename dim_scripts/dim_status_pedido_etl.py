@@ -1,6 +1,6 @@
 # dim_scripts/dim_status_pedido_etl.py
 from config import DB_DW
-from utils import connect_to_db, execute_sql
+from utils import connect_to_db
 from psycopg2.extras import execute_batch
 
 def etl_dim_status_pedido():

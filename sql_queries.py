@@ -38,8 +38,15 @@ CREATE TABLE IF NOT EXISTS dim_user (
     car_plate VARCHAR(20),
     user_location VARCHAR(255),
     cpf VARCHAR(20),
+    app_platform VARCHAR(255),
+    app_version VARCHAR(255),
     is_banned BOOLEAN,
-    institution_name VARCHAR(255)
+    institution_id INT UNIQUE NOT NULL,    
+    institution_name VARCHAR(255),
+    institution_color VARCHAR(10),
+    u.created_at TIMESTAMP,
+    u.updated_at TIMESTAMP,
+    u.deleted_at TIMESTAMP
 );
 """
 
@@ -49,7 +56,9 @@ CREATE TABLE IF NOT EXISTS dim_neighborhood (
     neighborhood_id INT UNIQUE NOT NULL,
     neighborhood_name VARCHAR(100) NOT NULL,
     distance_to_fundao NUMERIC(10, 2),
+    zone_id INT UNIQUE NOT NULL,
     zone_name VARCHAR(100) -- Desnormalizado de DimZone
+    zone_color VARCHAR(10) -- Desnormalizado de DimZone
 );
 """
 
@@ -58,8 +67,16 @@ CREATE TABLE IF NOT EXISTS dim_hub (
     hub_sk SERIAL PRIMARY KEY,
     hub_id INT UNIQUE NOT NULL,
     hub_name VARCHAR(100) NOT NULL,
+    center VARCHAR(100),
+    campus_id INT UNIQUE NOT NULL,
     campus_name VARCHAR(100) NOT NULL, -- Desnormalizado de DimCampi
-    campus_color VARCHAR(50)
+    campus_color VARCHAR(10),
+    campus_created_at TIMESTAMP,
+    campus_updated_at TIMESTAMP,
+    institution_id INT UNIQUE NOT NULL,
+    institution_name VARCHAR(255),
+    institution_created_at TIMESTAMP,
+    institution_updated_at TIMESTAMP
 );
 """
 
@@ -76,24 +93,26 @@ CREATE TABLE IF NOT EXISTS fato_carona (
     ride_pk SERIAL PRIMARY KEY, -- Chave primária para o fato
     ride_id INT UNIQUE NOT NULL, -- Chave de negócio original da carona
     driver_user_sk INT NOT NULL,
-    zone_sk INT NOT NULL,
     neighborhood_sk INT NOT NULL,
     hub_sk INT NOT NULL,
     date_sk INT NOT NULL,
-    hour_sk INT NOT NULL, -- Para hora e minuto da criação da carona
+    hour_sk INT NOT NULL,
     is_going_to_campus BOOLEAN,
-    slots INT,
     is_routine_ride BOOLEAN,
+    routine_id INT NOT NULL,
+    slots INT,
+    week_days VARCHAR(50),
+    repeats_until TIMESTAMP,
+    done BOOLEAN,
     requests_count INT DEFAULT 0,
     accepted_requests_count INT DEFAULT 0,
     refused_requests_count INT DEFAULT 0,
     pending_requests_count INT DEFAULT 0,
     quit_requests_count INT DEFAULT 0,
     messages_count INT DEFAULT 0,
-    description TEXT,
-    done BOOLEAN, -- Incluir com cautela se for usar, dada a sua baixa confiabilidade
     created_at TIMESTAMP, -- Para controle do ETL, marca d'água
     updated_at TIMESTAMP, -- Para controle do ETL, marca d'água
+    deleted_at TIMESTAMP, -- Para controle do ETL, marca d'água
 
     FOREIGN KEY (driver_user_sk) REFERENCES dim_user(user_sk),
     FOREIGN KEY (zone_sk) REFERENCES dim_zone(zone_sk),
