@@ -11,12 +11,13 @@ from dim_scripts.dim_user_etl import etl_dim_user
 from dim_scripts.dim_neighborhood_etl import etl_dim_neighborhood
 from dim_scripts.dim_hub_etl import etl_dim_hub
 from dim_scripts.dim_status_pedido_etl import etl_dim_status_pedido
+from dim_scripts.dim_flags_carona_etl import etl_dim_flags_carona
 
 from fact_scripts.fact_carona_etl import etl_fact_carona
 from fact_scripts.fact_interacao_carona_etl import etl_fact_interacao_carona
 
 from utils import connect_to_db, execute_sql, insert_unknown_dim_member
-from sql_queries import ALL_DDL_DROP_QUERIES, ALL_DDL_CREATE_QUERIES, ALL_DDL_DROP_QUERIES_MENOS_TEMPO, ALL_DDL_CREATE_QUERIES_MENOS_TEMPO
+from sql_queries import get_queries
 from config import DB_OLTP, DB_DW, LAST_RUN_FILE
 
 def get_last_etl_run_date():
@@ -35,7 +36,7 @@ def set_last_etl_run_date(dt):
     with open(LAST_RUN_FILE, 'w') as f:
         f.write(dt.strftime("%Y-%m-%d %H:%M:%S.%f"))
 
-def create_dw_tables(conn_dw, recria_dim_time):
+def create_dw_tables(conn_dw, recria_dim_time, recria_dim_flags_carona):
     """
     Dropa todas as tabelas existentes no DW e as recria.
     Isso garante um ambiente limpo para cada execução completa do ETL.
@@ -43,12 +44,8 @@ def create_dw_tables(conn_dw, recria_dim_time):
     """
     print("Verificando e recriando tabelas do Data Warehouse...")
 
-    if recria_dim_time:
-        DROP_QUERIES = ALL_DDL_DROP_QUERIES
-        CREATE_QUERIES = ALL_DDL_CREATE_QUERIES
-    else:
-        DROP_QUERIES = ALL_DDL_DROP_QUERIES_MENOS_TEMPO
-        CREATE_QUERIES = ALL_DDL_CREATE_QUERIES_MENOS_TEMPO
+    # Retorna as queries de DDL baseado na configuração requisitada para as duas tabelas pré-populadas
+    DROP_QUERIES, CREATE_QUERIES = get_queries(recria_dim_time=recria_dim_time, recria_dim_flags_carona=recria_dim_flags_carona)
     
     try:
         cur = conn_dw.cursor()
@@ -177,7 +174,7 @@ def insert_all_unknown_dim_members(conn_dw):
     print("--- Todos os membros 'Desconhecidos' inseridos com sucesso ---")
     return True
 
-def main_etl_process(apaga_ultimo_etl_run, recria_dim_time):
+def main_etl_process(apaga_ultimo_etl_run, recria_dim_time, recria_dim_flags_carona):
     conn_oltp = None
     conn_dw = None
     try:
@@ -205,7 +202,7 @@ def main_etl_process(apaga_ultimo_etl_run, recria_dim_time):
         print("Conexões com os bancos de dados estabelecidas com sucesso.")
 
         # 1. Criar/Recriar tabelas do DW (Drop e Create)
-        if not create_dw_tables(conn_dw, recria_dim_time):
+        if not create_dw_tables(conn_dw, recria_dim_time, recria_dim_flags_carona):
             print("ETL abortado devido a falha na criação/recriação das tabelas do DW.")
             return # Sai da função se as tabelas não puderem ser criadas
 
@@ -224,9 +221,14 @@ def main_etl_process(apaga_ultimo_etl_run, recria_dim_time):
 
         # 3. Executar ETL das Dimensões
         print("\n--- Iniciando ETL das Dimensões ---")
-        # A dim_time geralmente só precisa ser carregada uma vez ou quando estender o período.
+
+        # A dim_time geralmente só precisa ser carregada uma vez ou quando estender o período
         if recria_dim_time:
             etl_dim_time()
+        
+        # A dim_flags_carona só precisa ser carregada uma vez
+        if recria_dim_flags_carona:
+            etl_dim_flags_carona()
         
         if not etl_dim_user(): print("ETL DimUser falhou.")
         if not etl_dim_neighborhood(): print("ETL DimNeighborhood falhou.")
@@ -264,7 +266,7 @@ def main_etl_process(apaga_ultimo_etl_run, recria_dim_time):
 if __name__ == "__main__":
     # Para forçar uma carga completa (apaga o last_etl_run.txt e recarrega tudo):
     # Use isso quando quiser ter certeza que tudo está limpo e do zero.
-    main_etl_process(apaga_ultimo_etl_run=True, recria_dim_time=True)
+    main_etl_process(apaga_ultimo_etl_run=True, recria_dim_time=False, recria_dim_flags_carona=True)
 
     # Para uma carga normal (mantém o last_etl_run.txt e faz carga incremental):
-    # main_etl_process(apaga_ultimo_etl_run=False, recria_dim_time=False)
+    # main_etl_process(apaga_ultimo_etl_run=False, recria_dim_time=False, recria_dim_flags_carona=True)

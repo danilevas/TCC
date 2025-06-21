@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS dim_user (
     course VARCHAR(100),
     phone_number VARCHAR(100),
     email VARCHAR(255),
-    has_car BOOLEAN,
+    has_car BOOLEAN NOT NULL,
     car_model VARCHAR(100),
     car_color VARCHAR(50),
     car_plate VARCHAR(20),
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS dim_user (
     cpf VARCHAR(20),
     app_platform VARCHAR(255),
     app_version VARCHAR(255),
-    is_banned BOOLEAN,
+    is_banned BOOLEAN NOT NULL,
     institution_id INT UNIQUE NOT NULL,    
     institution_name VARCHAR(255),
     institution_color VARCHAR(10),
@@ -87,6 +87,24 @@ CREATE TABLE IF NOT EXISTS dim_status_pedido (
 );
 """
 
+# Dimensão sucata
+CREATE_DIM_FLAGS_CARONA_TABLE = """
+CREATE TABLE IF NOT EXISTS dim_flags_carona (
+    flags_carona_sk SERIAL PRIMARY KEY,
+    is_routine_ride BOOLEAN NOT NULL,
+    is_going_to_campus BOOLEAN NOT NULL,
+    done BOOLEAN NOT NULL,
+    is_routine_monday BOOLEAN NOT NULL,
+    is_routine_tuesday BOOLEAN NOT NULL,
+    is_routine_wednesday BOOLEAN NOT NULL,
+    is_routine_thursday BOOLEAN NOT NULL,
+    is_routine_friday BOOLEAN NOT NULL,
+    is_routine_saturday BOOLEAN NOT NULL,
+    is_routine_sunday BOOLEAN NOT NULL,
+    flags_description VARCHAR(255) UNIQUE -- Para facilitar a visualização e garantir unicidade da combinação textual
+);
+"""
+
 # DDLs para as tabelas de fatos
 CREATE_FACT_CARONA_TABLE = """
 CREATE TABLE IF NOT EXISTS fato_carona (
@@ -97,13 +115,10 @@ CREATE TABLE IF NOT EXISTS fato_carona (
     hub_sk INT NOT NULL,
     date_sk INT NOT NULL,
     hour_sk INT NOT NULL,
-    is_going_to_campus BOOLEAN,
-    is_routine_ride BOOLEAN,
+    flags_carona_sk INT NOT NULL,
     routine_id INT NOT NULL,
     slots INT,
-    week_days VARCHAR(50),
     repeats_until TIMESTAMP,
-    done BOOLEAN,
     requests_count INT DEFAULT 0,
     accepted_requests_count INT DEFAULT 0,
     refused_requests_count INT DEFAULT 0,
@@ -132,12 +147,12 @@ CREATE TABLE IF NOT EXISTS fato_interacao_carona (
     date_sk INT NOT NULL,
     hour_sk INT NOT NULL, -- Para hora e minuto da interação
     status_sk INT NOT NULL, -- Status final da interação
-    is_driver_interaction BOOLEAN,
-    is_passenger_request BOOLEAN,
-    request_accepted BOOLEAN,
-    request_refused BOOLEAN,
-    request_pending BOOLEAN,
-    request_quit BOOLEAN,
+    is_driver_interaction BOOLEAN NOT NULL,
+    is_passenger_request BOOLEAN NOT NULL,
+    request_accepted BOOLEAN NOT NULL,
+    request_refused BOOLEAN NOT NULL,
+    request_pending BOOLEAN NOT NULL,
+    request_quit BOOLEAN NOT NULL,
     created_at TIMESTAMP, -- Para controle do ETL, marca d'água
     updated_at TIMESTAMP, -- Para controle do ETL, marca d'água
 
@@ -156,6 +171,7 @@ DROP_DIM_USER_TABLE = "DROP TABLE IF EXISTS dim_user CASCADE;"
 DROP_DIM_NEIGHBORHOOD_TABLE = "DROP TABLE IF EXISTS dim_neighborhood CASCADE;"
 DROP_DIM_HUB_TABLE = "DROP TABLE IF EXISTS dim_hub CASCADE;"
 DROP_DIM_STATUS_PEDIDO_TABLE = "DROP TABLE IF EXISTS dim_status_pedido CASCADE;"
+DROP_DIM_FLAGS_CARONA_TABLE = "DROP TABLE IF EXISTS dim_flags_carona CASCADE;"
 
 ALL_DDL_DROP_QUERIES = [
     DROP_FACT_CARONA_TABLE,
@@ -164,7 +180,8 @@ ALL_DDL_DROP_QUERIES = [
     DROP_DIM_USER_TABLE,
     DROP_DIM_NEIGHBORHOOD_TABLE,
     DROP_DIM_HUB_TABLE,
-    DROP_DIM_STATUS_PEDIDO_TABLE
+    DROP_DIM_STATUS_PEDIDO_TABLE,
+    DROP_DIM_FLAGS_CARONA_TABLE
 ]
 
 ALL_DDL_CREATE_QUERIES = [
@@ -173,24 +190,21 @@ ALL_DDL_CREATE_QUERIES = [
     CREATE_DIM_NEIGHBORHOOD_TABLE,
     CREATE_DIM_HUB_TABLE,
     CREATE_DIM_STATUS_PEDIDO_TABLE,
+    CREATE_DIM_FLAGS_CARONA_TABLE,
     CREATE_FACT_CARONA_TABLE,
     CREATE_FACT_INTERACAO_CARONA_TABLE
 ]
 
-ALL_DDL_DROP_QUERIES_MENOS_TEMPO = [
-    DROP_FACT_CARONA_TABLE,
-    DROP_FACT_INTERACAO_CARONA_TABLE,
-    DROP_DIM_USER_TABLE,
-    DROP_DIM_NEIGHBORHOOD_TABLE,
-    DROP_DIM_HUB_TABLE,
-    DROP_DIM_STATUS_PEDIDO_TABLE
-]
-
-ALL_DDL_CREATE_QUERIES_MENOS_TEMPO = [
-    CREATE_DIM_USER_TABLE,
-    CREATE_DIM_NEIGHBORHOOD_TABLE,
-    CREATE_DIM_HUB_TABLE,
-    CREATE_DIM_STATUS_PEDIDO_TABLE,
-    CREATE_FACT_CARONA_TABLE,
-    CREATE_FACT_INTERACAO_CARONA_TABLE
-]
+# Retorna as queries de DDL corretamente
+def get_queries(recria_dim_time, recria_dim_flags_carona):
+    # Se não quisermos recriar a tabela dim_time, não a dropamos nem a criamos
+    if not recria_dim_time:
+        ALL_DDL_DROP_QUERIES.remove(DROP_DIM_TIME_TABLE)
+        ALL_DDL_CREATE_QUERIES.remove(CREATE_DIM_TIME_TABLE)
+    
+    # Se não quisermos recriar a tabela dim_flags_carona, não a dropamos nem a criamos
+    if not recria_dim_flags_carona:
+        ALL_DDL_DROP_QUERIES.remove(DROP_DIM_FLAGS_CARONA_TABLE)
+        ALL_DDL_CREATE_QUERIES.remove(CREATE_DIM_FLAGS_CARONA_TABLE)
+    
+    return ALL_DDL_DROP_QUERIES, ALL_DDL_CREATE_QUERIES

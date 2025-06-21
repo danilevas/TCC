@@ -1,8 +1,8 @@
 # dim_scripts/dim_time_etl.py
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 from config import DB_DW
-from utils import connect_to_db, execute_sql
+from utils import connect_to_db
 
 def etl_dim_time():
     conn_dw = connect_to_db(DB_DW)
