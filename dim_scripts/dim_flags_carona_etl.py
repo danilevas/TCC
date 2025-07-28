@@ -3,6 +3,7 @@ import itertools
 from config import DB_DW
 from utils import connect_to_db
 from psycopg2.extras import execute_batch
+import pandas as pd
 
 # Mapeamento para os dias da semana (1=Segunda, ..., 7=Domingo) JÁ CHEQUEI E É ISSO MESMO
 # Isso deve ser consistente com o que foi usado na pré-população da dim_carona_flags
@@ -55,7 +56,6 @@ def load_carona_flags_lookup(conn_dw):
     except Exception as e:
         print(f"Erro ao carregar dim_carona_flags para lookup: {e}")
         _CARONA_FLAGS_LOOKUP_DICT = {} # Limpa em caso de erro para tentar novamente se necessário
-
 
 def derive_and_lookup_flags(row_oltp):
     """

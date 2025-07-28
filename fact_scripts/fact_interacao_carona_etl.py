@@ -1,7 +1,7 @@
 # fact_scripts/fact_interacao_carona_etl.py
 import pandas as pd
 from config import DB_OLTP, DB_DW
-from utils import connect_to_db, get_last_etl_run_date
+from utils import connect_to_db, get_last_etl_run_date_se_houver
 from psycopg2.extras import execute_batch
 
 def etl_fact_interacao_carona(last_etl_run_date_str=None):
@@ -14,7 +14,7 @@ def etl_fact_interacao_carona(last_etl_run_date_str=None):
 
     try:
         # Obter o último timestamp do DW para carga incremental
-        last_etl_run_date = get_last_etl_run_date(conn_dw, last_etl_run_date_str)
+        last_etl_run_date = get_last_etl_run_date_se_houver(conn_dw, last_etl_run_date_str)
 
         print(f"Extraindo dados de ride_user. A partir de: {last_etl_run_date}")
 

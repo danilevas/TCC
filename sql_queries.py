@@ -44,9 +44,9 @@ CREATE TABLE IF NOT EXISTS dim_user (
     institution_id INT UNIQUE NOT NULL,    
     institution_name VARCHAR(255),
     institution_color VARCHAR(10),
-    u.created_at TIMESTAMP,
-    u.updated_at TIMESTAMP,
-    u.deleted_at TIMESTAMP
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
+    deleted_at TIMESTAMP
 );
 """
 
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS dim_neighborhood (
     neighborhood_name VARCHAR(100) NOT NULL,
     distance_to_fundao NUMERIC(10, 2),
     zone_id INT UNIQUE NOT NULL,
-    zone_name VARCHAR(100) -- Desnormalizado de DimZone
+    zone_name VARCHAR(100), -- Desnormalizado de DimZone
     zone_color VARCHAR(10) -- Desnormalizado de DimZone
 );
 """
@@ -130,7 +130,6 @@ CREATE TABLE IF NOT EXISTS fato_carona (
     deleted_at TIMESTAMP, -- Para controle do ETL, marca d'água
 
     FOREIGN KEY (driver_user_sk) REFERENCES dim_user(user_sk),
-    FOREIGN KEY (zone_sk) REFERENCES dim_zone(zone_sk),
     FOREIGN KEY (neighborhood_sk) REFERENCES dim_neighborhood(neighborhood_sk),
     FOREIGN KEY (hub_sk) REFERENCES dim_hub(hub_sk),
     -- A FK deve referenciar a combinação única (date_sk, hour_sk)

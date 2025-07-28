@@ -85,7 +85,7 @@ def create_dw_tables(conn_dw, recria_dim_time, recria_dim_flags_carona):
     finally:
         cur.close()
 
-# --- NOVA FUNÇÃO PARA INSERIR TODOS OS MEMBROS DESCONHECIDOS ---
+# --- FUNÇÃO PARA INSERIR TODOS OS MEMBROS DESCONHECIDOS ---
 def insert_all_unknown_dim_members(conn_dw):
     """
     Insere o membro 'Desconhecido' em todas as tabelas de dimensão.
@@ -117,16 +117,26 @@ def insert_all_unknown_dim_members(conn_dw):
     # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_user em sql_queries.py
     dim_user_unknown_values = {
         'user_sk': -1,
-        'user_id': -1, # Verifique se 'user_id' existe na sua DDL de dim_user
+        'user_id': -1,
         'user_name': 'Desconhecido',
         'profile': 'Desconhecido',
         'course': 'Desconhecido',
-        'has_car': None,
+        'phone_number': 'Desconhecido',
+        'email': 'Desconhecido',
+        'has_car': False,
         'car_model': 'Desconhecido',
-        'car_color': 'Desconhecido',
+        'car_color': '#000000',
         'car_plate': 'Desconhecido',
-        'is_banned': None,
-        'institution_name': 'Desconhecido'
+
+        'user_location': 'Desconhecido',
+        'cpf': 'Desconhecido',
+        'app_platform': 'Desconhecido',
+        'app_version': 'Desconhecido',
+
+        'is_banned': False,
+        'institution_id': -1,
+        'institution_name': 'Desconhecido',
+        'institution_color': '#000000',
     }
     if not insert_unknown_dim_member(conn_dw, 'dim_user', ['user_sk'], dim_user_unknown_values):
         print("Falha ao inserir membro 'Desconhecido' para dim_user.")
@@ -136,9 +146,10 @@ def insert_all_unknown_dim_members(conn_dw):
     # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_neighborhood em sql_queries.py
     dim_neighborhood_unknown_values = {
         'neighborhood_sk': -1,
-        'neighborhood_id': -1, # Verifique se 'neighborhood_id' existe na sua DDL
+        'neighborhood_id': -1,
         'neighborhood_name': 'Desconhecido',
         'distance_to_fundao': 0.0, # Ou outro valor numérico padrão
+        'zone_id': -1,
         'zone_name': 'Desconhecido',
         'zone_color': '#000000'
     }
@@ -150,10 +161,13 @@ def insert_all_unknown_dim_members(conn_dw):
     # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_hub em sql_queries.py
     dim_hub_unknown_values = {
         'hub_sk': -1,
-        'hub_id': -1, # Verifique se 'hub_id' existe na sua DDL
+        'hub_id': -1,
         'hub_name': 'Desconhecido',
+        'center': 'Desconhecido',
+        'campus_id': -1,
         'campus_name': 'Desconhecido',
         'campus_color': '#000000',
+        'institution_id': -1,
         'institution_name': 'Desconhecido'
     }
     if not insert_unknown_dim_member(conn_dw, 'dim_hub', ['hub_sk'], dim_hub_unknown_values):
@@ -165,10 +179,29 @@ def insert_all_unknown_dim_members(conn_dw):
     dim_status_pedido_unknown_values = {
         'status_sk': -1,
         'status_name': 'Desconhecido'
-        # Adicione TODAS as outras colunas da sua DDL de dim_status_pedido
     }
     if not insert_unknown_dim_member(conn_dw, 'dim_status_pedido', ['status_sk'], dim_status_pedido_unknown_values):
         print("Falha ao inserir membro 'Desconhecido' para dim_status_pedido.")
+        return False
+    
+    # --- dim_flags_carona ---
+    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_flags_carona em sql_queries.py
+    dim_flags_carona_unknown_values = {
+        'flags_carona_sk': -1,
+        'is_routine_ride': False,
+        'is_going_to_campus': False,
+        'done': False,
+        'is_routine_monday': False,
+        'is_routine_tuesday': False,
+        'is_routine_wednesday': False,
+        'is_routine_thursday': False,
+        'is_routine_friday': False,
+        'is_routine_saturday': False,
+        'is_routine_sunday': False,
+        'flags_description': 'Desconhecido',
+    }
+    if not insert_unknown_dim_member(conn_dw, 'dim_flags_carona', ['flags_carona_sk'], dim_flags_carona_unknown_values):
+        print("Falha ao inserir membro 'Desconhecido' para dim_flags_carona.")
         return False
 
     print("--- Todos os membros 'Desconhecidos' inseridos com sucesso ---")
