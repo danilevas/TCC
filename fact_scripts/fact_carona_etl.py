@@ -3,6 +3,9 @@ import pandas as pd
 from config import DB_OLTP, DB_DW
 from utils import connect_to_db, get_last_etl_run_date_se_houver
 from psycopg2.extras import execute_batch
+import numpy as np # Importar numpy para pd.NA
+
+from dim_scripts.dim_flags_carona_etl import load_flags_carona_lookup, derive_and_lookup_flags, _FLAGS_CARONA_LOOKUP_DICT
 
 def etl_fact_carona(last_etl_run_date_str=None):
     conn_oltp = connect_to_db(DB_OLTP)
@@ -13,6 +16,12 @@ def etl_fact_carona(last_etl_run_date_str=None):
         return False
 
     try:
+        # 0. Carregar a dim_flags_carona para lookup em memória
+        load_flags_carona_lookup(conn_dw)
+        if not _FLAGS_CARONA_LOOKUP_DICT:
+            print("Não foi possível carregar dim_flags_carona. ETL FatoCarona abortado.")
+            return False
+        
         # Obter o último timestamp do DW para carga incremental
         last_etl_run_date = get_last_etl_run_date_se_houver(conn_dw, last_etl_run_date_str)
         print(f"Extraindo dados de caronas (rides) e ride_user. A partir de: {last_etl_run_date}")
@@ -23,10 +32,10 @@ def etl_fact_carona(last_etl_run_date_str=None):
         query_extract_rides = f"""
         SELECT
             r.id AS ride_id,
-            r.neighborhood AS neighborhood_name, -- Temos que pegar o neighborhood_id  
+            r.neighborhood AS neighborhood_name, -- Para depois pegarmos o neighborhood_id  
             r.going AS is_going_to_campus, -- Renomear para clareza
             r.routine_id,
-            r.hub AS hub_name, -- Temos que pegar o hub_id
+            r.hub AS hub_name, -- Para depois pegarmos o hub_id
             r.slots,
             r.created_at,
             r.updated_at,
@@ -80,6 +89,12 @@ def etl_fact_carona(last_etl_run_date_str=None):
 
         # Determinar se é carona de rotina
         rides_data['is_routine_ride'] = (rides_data['week_days'].notna()) | (rides_data['repeats_until'].notna())
+
+        print("Derivando flags e buscando flags_carona_sk...")
+        # A coluna 'is_routine_ride' do OLTP, 'week_days', 'description' e 'done'
+        # são passadas para 'derive_and_lookup_flags' através do row_oltp.
+        rides_data['flags_carona_sk'] = rides_data.apply(derive_and_lookup_flags, axis=1)
+        print("Flags e flags_carona_sk processados.")
 
         # Agregar métricas de pedidos
         # Usar pivot_table para garantir que todos os status possíveis são colunas
