@@ -2,6 +2,7 @@
 import pandas as pd
 from config import DB_OLTP, DB_DW
 from utils import connect_to_db
+from psycopg2.extras import execute_batch
 
 def etl_dim_neighborhood():
     conn_oltp = connect_to_db(DB_OLTP)
@@ -28,23 +29,24 @@ def etl_dim_neighborhood():
         neighborhoods_data = pd.read_sql(query_extract_neighborhoods, conn_oltp)
         print(f"Extraídos {len(neighborhoods_data)} bairros.")
 
-        neighborhoods_data.rename(columns={
-            'id': 'neighborhood_id',
-            'name': 'neighborhood_name'
-        }, inplace=True)
+        # neighborhoods_data.rename(columns={
+        #     'id': 'neighborhood_id',
+        #     'name': 'neighborhood_name'
+        # }, inplace=True)
+        
         neighborhoods_data = neighborhoods_data.replace({pd.NA: None, '': None})
 
         print("Carregando dados na dim_neighborhood...")
-        from psycopg2.extras import execute_batch
+
         insert_or_update_query = """
         INSERT INTO dim_neighborhood (neighborhood_id, neighborhood_name, distance_to_fundao, zone_id, zone_name, zone_color)
-        VALUES (%(neighborhood_id)s, %(neighborhood_name)s, %(distance)s, %(zone_id)s %(zone_name)s, %(zone_color)s)
+        VALUES (%(neighborhood_id)s, %(neighborhood_name)s, %(distance_to_fundao)s, %(zone_id)s, %(zone_name)s, %(zone_color)s)
         ON CONFLICT (neighborhood_id) DO UPDATE SET
             neighborhood_name = EXCLUDED.neighborhood_name,
             distance_to_fundao = EXCLUDED.distance_to_fundao,
             zone_id = EXCLUDED.zone_id,
             zone_name = EXCLUDED.zone_name,
-            zone_color = EXCLUDED.zone_color;
+            zone_color = EXCLUDED.zone_color
         """
         data_to_load = neighborhoods_data.to_dict(orient='records')
 

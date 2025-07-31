@@ -100,7 +100,7 @@ def etl_fact_interacao_carona(last_etl_run_date_str=None):
             request_refused = EXCLUDED.request_refused,
             request_pending = EXCLUDED.request_pending,
             request_quit = EXCLUDED.request_quit,
-            updated_at = EXCLUDED.updated_at;
+            updated_at = EXCLUDED.updated_at
         """
         data_to_load_dicts = fact_data_to_load.to_dict(orient='records')
 

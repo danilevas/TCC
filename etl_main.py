@@ -136,7 +136,6 @@ def insert_all_unknown_dim_members(conn_dw):
         'is_banned': False,
         'institution_id': -1,
         'institution_name': 'Desconhecido',
-        'institution_color': '#000000',
     }
     if not insert_unknown_dim_member(conn_dw, 'dim_user', ['user_sk'], dim_user_unknown_values):
         print("Falha ao inserir membro 'Desconhecido' para dim_user.")

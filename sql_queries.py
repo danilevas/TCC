@@ -41,9 +41,8 @@ CREATE TABLE IF NOT EXISTS dim_user (
     app_platform VARCHAR(255),
     app_version VARCHAR(255),
     is_banned BOOLEAN NOT NULL,
-    institution_id INT UNIQUE NOT NULL,    
+    institution_id INT NOT NULL,    
     institution_name VARCHAR(255),
-    institution_color VARCHAR(10),
     created_at TIMESTAMP,
     updated_at TIMESTAMP,
     deleted_at TIMESTAMP
@@ -55,8 +54,8 @@ CREATE TABLE IF NOT EXISTS dim_neighborhood (
     neighborhood_sk SERIAL PRIMARY KEY,
     neighborhood_id INT UNIQUE NOT NULL,
     neighborhood_name VARCHAR(100) NOT NULL,
-    distance_to_fundao NUMERIC(10, 2),
-    zone_id INT UNIQUE NOT NULL,
+    distance_to_fundao NUMERIC(8, 2),
+    zone_id INT NOT NULL,
     zone_name VARCHAR(100), -- Desnormalizado de DimZone
     zone_color VARCHAR(10) -- Desnormalizado de DimZone
 );
@@ -68,12 +67,12 @@ CREATE TABLE IF NOT EXISTS dim_hub (
     hub_id INT UNIQUE NOT NULL,
     hub_name VARCHAR(100) NOT NULL,
     center VARCHAR(100),
-    campus_id INT UNIQUE NOT NULL,
+    campus_id INT NOT NULL,
     campus_name VARCHAR(100) NOT NULL, -- Desnormalizado de DimCampi
     campus_color VARCHAR(10),
     campus_created_at TIMESTAMP,
     campus_updated_at TIMESTAMP,
-    institution_id INT UNIQUE NOT NULL,
+    institution_id INT NOT NULL,
     institution_name VARCHAR(255),
     institution_created_at TIMESTAMP,
     institution_updated_at TIMESTAMP

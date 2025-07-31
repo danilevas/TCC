@@ -35,7 +35,6 @@ def etl_dim_hub():
         hubs_data = pd.read_sql(query_extract_hubs, conn_oltp)
         print(f"Extraídos {len(hubs_data)} pólos.")
 
-        hubs_data.rename(columns={'id': 'hub_id', 'name': 'hub_name'}, inplace=True)
         hubs_data = hubs_data.replace({pd.NA: None, '': None})
 
         print("Carregando dados na dim_hub...")
@@ -46,7 +45,7 @@ def etl_dim_hub():
             campus_id, campus_name, campus_color, campus_created_at, campus_updated_at,
             institution_id, institution_name, institution_created_at, institution_updated_at
         ) VALUES (
-            %(hub_id)s, %(hub_name)s, %(center)s
+            %(hub_id)s, %(hub_name)s, %(center)s,
             %(campus_id)s, %(campus_name)s, %(campus_color)s, %(campus_created_at)s, %(campus_updated_at)s,
              %(institution_id)s, %(institution_name)s, %(institution_created_at)s, %(institution_updated_at)s
         )
@@ -62,7 +61,7 @@ def etl_dim_hub():
             institution_id = EXCLUDED.institution_id,
             institution_name = EXCLUDED.institution_name,
             institution_created_at = EXCLUDED.institution_created_at,
-            institution_updated_at = EXCLUDED.institution_updated_at;
+            institution_updated_at = EXCLUDED.institution_updated_at
         """
         data_to_load = hubs_data.to_dict(orient='records')
 

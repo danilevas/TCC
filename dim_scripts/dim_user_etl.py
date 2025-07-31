@@ -31,9 +31,8 @@ def etl_dim_user():
             u.app_platform,
             u.app_version,
             u.banned AS is_banned,
-            i.id AS institution_id,      
-            i.name AS institution_name,  
-            i.color AS institution_color,
+            i.id AS institution_id,
+            i.name AS institution_name,
             u.created_at,
             u.updated_at,
             u.deleted_at
@@ -65,14 +64,14 @@ def etl_dim_user():
             phone_number, email, has_car,
             car_model, car_color, car_plate,
             user_location, cpf, app_platform, app_version,
-            is_banned, institution_id, institution_name, institution_color,
+            is_banned, institution_id, institution_name,
             created_at, updated_at, deleted_at
         ) VALUES (
             %(user_id)s, %(user_name)s, %(profile)s, %(course)s,
             %(phone_number)s, %(email)s, %(has_car)s,
             %(car_model)s, %(car_color)s, %(car_plate)s,
             %(user_location)s, %(cpf)s, %(app_platform)s, %(app_version)s,
-            %(is_banned)s, %(institution_id)s, %(institution_name)s, %(institution_color)s,
+            %(is_banned)s, %(institution_id)s, %(institution_name)s,
             %(created_at)s, %(updated_at)s, %(deleted_at)s
         ) ON CONFLICT (user_id) DO UPDATE SET
             user_name = EXCLUDED.user_name,
@@ -89,12 +88,11 @@ def etl_dim_user():
             app_platform = EXCLUDED.app_platform,
             app_version = EXCLUDED.app_version,
             is_banned = EXCLUDED.is_banned,
-            institution_id = EXCLUDED.institution_id;
-            institution_name = EXCLUDED.institution_name;
-            institution_color = EXCLUDED.institution_color;
-            created_at = EXCLUDED.created_at;
-            updated_at = EXCLUDED.updated_at;
-            deleted_at = EXCLUDED.deleted_at;
+            institution_id = EXCLUDED.institution_id,
+            institution_name = EXCLUDED.institution_name,
+            created_at = EXCLUDED.created_at,
+            updated_at = EXCLUDED.updated_at,
+            deleted_at = EXCLUDED.deleted_at
         """
         
         # Converter DataFrame para lista de dicionários para execute_batch

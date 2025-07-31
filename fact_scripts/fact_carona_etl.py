@@ -5,7 +5,7 @@ from utils import connect_to_db, get_last_etl_run_date_se_houver
 from psycopg2.extras import execute_batch
 import numpy as np # Importar numpy para pd.NA
 
-from dim_scripts.dim_flags_carona_etl import load_flags_carona_lookup, derive_and_lookup_flags, _FLAGS_CARONA_LOOKUP_DICT
+from dim_scripts.dim_flags_carona_etl import load_flags_carona_lookup, derive_and_lookup_flags
 
 def etl_fact_carona(last_etl_run_date_str=None):
     conn_oltp = connect_to_db(DB_OLTP)
@@ -18,6 +18,10 @@ def etl_fact_carona(last_etl_run_date_str=None):
     try:
         # 0. Carregar a dim_flags_carona para lookup em memória
         load_flags_carona_lookup(conn_dw)
+
+        # Agora importamos o dicionário de lookup
+        from dim_scripts.dim_flags_carona_etl import _FLAGS_CARONA_LOOKUP_DICT
+
         if not _FLAGS_CARONA_LOOKUP_DICT:
             print("Não foi possível carregar dim_flags_carona. ETL FatoCarona abortado.")
             return False
@@ -27,15 +31,15 @@ def etl_fact_carona(last_etl_run_date_str=None):
         print(f"Extraindo dados de caronas (rides) e ride_user. A partir de: {last_etl_run_date}")
 
         # 1. Extração (Extract) dos dados incrementais do OLTP
-        # JOIN com ride_user para garantir que pegamos o driver_id associado à carona
-        # e com messages para contar as mensagens (se houver uma tabela de mensagens)
+        # LEFT JOIN com ride_user para garantir que pegamos o driver_id associado à carona (e driver_id=null para as deletadas)
+        # e com messages para contar as mensagens
         query_extract_rides = f"""
         SELECT
             r.id AS ride_id,
-            r.neighborhood AS neighborhood_name, -- Para depois pegarmos o neighborhood_id  
+            r.neighborhood AS neighborhood_name, -- Para depois pegarmos o neighborhood_sk
             r.going AS is_going_to_campus, -- Renomear para clareza
             r.routine_id,
-            r.hub AS hub_name, -- Para depois pegarmos o hub_id
+            r.hub AS hub_name, -- Para depois pegarmos o hub_sk
             r.slots,
             r.created_at,
             r.updated_at,
@@ -46,13 +50,13 @@ def etl_fact_carona(last_etl_run_date_str=None):
             r.date,
             ru_driver.user_id AS driver_id
         FROM rides r 
-        JOIN ride_user ru_driver ON r.id = ru_driver.ride_id AND ru_driver.status = 'driver'
+        LEFT JOIN ride_user ru_driver ON r.id = ru_driver.ride_id AND ru_driver.status = 'driver'
         LEFT JOIN (
             SELECT ride_id, COUNT(*) AS num_messages
             FROM messages
             GROUP BY ride_id
         ) AS message_counts ON r.id = message_counts.ride_id
-        WHERE r.created_at >= '{last_etl_run_date}' OR r.updated_at >= '{last_etl_run_date}' OR r.deleted_at >= '{last_etl_run_date}';
+        WHERE (r.created_at >= '{last_etl_run_date}' OR r.updated_at >= '{last_etl_run_date}' OR r.deleted_at >= '{last_etl_run_date}');
         """
         rides_data = pd.read_sql(query_extract_rides, conn_oltp)
 
@@ -63,7 +67,7 @@ def etl_fact_carona(last_etl_run_date_str=None):
             ride_id,
             status
         FROM ride_user
-        WHERE created_at >= '{last_etl_run_date}' OR updated_at >= '{last_etl_run_date}';
+        WHERE (created_at >= '{last_etl_run_date}' OR updated_at >= '{last_etl_run_date}');
         """
         ride_users_agg_data = pd.read_sql(query_extract_ride_users_for_aggregation, conn_oltp)
 
@@ -89,6 +93,9 @@ def etl_fact_carona(last_etl_run_date_str=None):
 
         # Determinar se é carona de rotina
         rides_data['is_routine_ride'] = (rides_data['week_days'].notna()) | (rides_data['repeats_until'].notna())
+
+        # Converter a coluna is_routine_ride para Python booleano (True/False)
+        rides_data['is_routine_ride'] = rides_data['is_routine_ride'].fillna(False).astype(bool)
 
         print("Derivando flags e buscando flags_carona_sk...")
         # A coluna 'is_routine_ride' do OLTP, 'week_days', 'description' e 'done'
@@ -137,9 +144,6 @@ def etl_fact_carona(last_etl_run_date_str=None):
             'is_going_to_campus': False, 'slots': 0, 'is_routine_ride': False,
             'driver_creation_events_agg': 0
         }, inplace=True)
-        
-        # Converter a coluna is_routine_ride para Python booleano (True/False)
-        rides_data['is_routine_ride'] = rides_data['is_routine_ride'].fillna(False).astype(bool)
 
         # Obter chaves substitutas das dimensões já carregadas
         # Otimização: Carregar mapas de SKs uma vez
@@ -149,7 +153,6 @@ def etl_fact_carona(last_etl_run_date_str=None):
 
         # Convertendo para numéricos os mapas das dimensões
         dim_user_map['user_id'] = pd.to_numeric(dim_user_map['user_id'], errors='coerce').astype('Int64')
-        dim_neighborhood_map['neighborhood_id'] = pd.to_numeric(dim_neighborhood_map['neighborhood_id'], errors='coerce').astype('Int64')
         dim_hub_map['hub_id'] = pd.to_numeric(dim_hub_map['hub_id'], errors='coerce').astype('Int64')
 
         # Fazendo o merge com dim_user_map
@@ -174,14 +177,13 @@ def etl_fact_carona(last_etl_run_date_str=None):
         # Limpar colunas temporárias e selecionar as finais
         final_fact_columns = [
             'ride_id', 'driver_user_sk', 'neighborhood_sk', 'hub_sk', 'date_sk', 'hour_sk',
-            'is_going_to_campus', 'is_routine_ride', 'routine_id', 'slots',
-            'week_days', 'repeats_until', 'done',
+            'routine_id', 'slots', 'repeats_until',
             'requests_count', 'accepted_requests_count', 'refused_requests_count',
             'pending_requests_count', 'quit_requests_count', 'messages_count',
             'created_at', 'updated_at', 'deleted_at'
         ]
         # Garantir que as colunas SK não são nulas se as FKs não são opcionais (refletir se deixamos assim, mas acho que sim)
-        rides_data.dropna(subset=['driver_user_sk', 'neighborhood_sk', 'hub_sk', 'date_sk', 'hour_sk'], inplace=True)
+        rides_data.dropna(subset=['driver_user_sk', 'neighborhood_sk', 'hub_sk', 'date_sk', 'hour_sk', 'flags_carona_sk'], inplace=True)
         
         fact_data_to_load = rides_data[final_fact_columns]
         fact_data_to_load = fact_data_to_load.replace({pd.NA: None, '': None})
@@ -192,15 +194,13 @@ def etl_fact_carona(last_etl_run_date_str=None):
         insert_or_update_query = """
         INSERT INTO fato_carona (
             ride_id, driver_user_sk, neighborhood_sk, hub_sk, date_sk, hour_sk,
-            is_going_to_campus, is_routine_ride, routine_id, slots,
-            week_days, repeats_until, done,
+            routine_id, slots, repeats_until,
             requests_count, accepted_requests_count, refused_requests_count,
             pending_requests_count, quit_requests_count, messages_count,
             created_at, updated_at, deleted_at
         ) VALUES (
             %(ride_id)s, %(driver_user_sk)s, %(neighborhood_sk)s, %(hub_sk)s, %(date_sk)s, %(hour_sk)s,
-            %(is_going_to_campus)s, %(is_routine_ride)s, %(routine_id)s, %(slots)s,
-            %(week_days)s, %(repeats_until)s, %(done)s,
+            %(routine_id)s, %(slots)s, %(repeats_until)s,
             %(requests_count)s, %(accepted_requests_count)s, %(refused_requests_count)s,
             %(pending_requests_count)s, %(quit_requests_count)s, %(messages_count)s
             %(created_at)s, %(updated_at)s, %(deleted_at)s
@@ -210,21 +210,17 @@ def etl_fact_carona(last_etl_run_date_str=None):
             hub_sk = EXCLUDED.hub_sk,
             date_sk = EXCLUDED.date_sk,
             hour_sk = EXCLUDED.hour_sk,
-            is_going_to_campus = EXCLUDED.is_going_to_campus,
-            is_routine_ride = EXCLUDED.is_routine_ride,
             routine_id = EXCLUDED.routine_id,
             slots = EXCLUDED.slots,
-            week_days = EXCLUDED.week_days,
             repeats_until = EXCLUDED.repeats_until,
-            done = EXCLUDED.done,
             requests_count = EXCLUDED.requests_count,
             accepted_requests_count = EXCLUDED.accepted_requests_count,
             refused_requests_count = EXCLUDED.refused_requests_count,
             pending_requests_count = EXCLUDED.pending_requests_count,
             quit_requests_count = EXCLUDED.quit_requests_count,
             messages_count = EXCLUDED.messages_count,
-            updated_at = EXCLUDED.updated_at; -- Atualizar o updated_at para a marca d'água
-            deleted_at = EXCLUDED.deleted_at; -- Atualizar o deleted_at para a marca d'água, se a carona foi deletada de lá pra cá
+            updated_at = EXCLUDED.updated_at, -- Atualizar o updated_at para a marca d'água
+            deleted_at = EXCLUDED.deleted_at -- Atualizar o deleted_at para a marca d'água, se a carona foi deletada de lá pra cá
         """
         data_to_load_dicts = fact_data_to_load.to_dict(orient='records')
 
