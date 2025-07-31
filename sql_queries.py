@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS fato_carona (
     date_sk INT NOT NULL,
     hour_sk INT NOT NULL,
     flags_carona_sk INT NOT NULL,
-    routine_id INT NOT NULL,
+    routine_id INT,
     slots INT,
     repeats_until TIMESTAMP,
     requests_count INT DEFAULT 0,
