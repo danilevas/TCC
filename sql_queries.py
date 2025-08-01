@@ -37,7 +37,6 @@ CREATE TABLE IF NOT EXISTS dim_user (
     car_color VARCHAR(50),
     car_plate VARCHAR(20),
     user_location VARCHAR(255),
-    cpf VARCHAR(20),
     app_platform VARCHAR(255),
     app_version VARCHAR(255),
     is_banned BOOLEAN NOT NULL,
@@ -107,7 +106,7 @@ CREATE TABLE IF NOT EXISTS dim_flags_carona (
 # DDLs para as tabelas de fatos
 CREATE_FACT_CARONA_TABLE = """
 CREATE TABLE IF NOT EXISTS fato_carona (
-    ride_pk SERIAL PRIMARY KEY, -- Chave primária para o fato
+    ride_sk SERIAL PRIMARY KEY, -- Chave primária para o fato
     ride_id INT UNIQUE NOT NULL, -- Chave de negócio original da carona
     driver_user_sk INT NOT NULL,
     neighborhood_sk INT NOT NULL,
@@ -140,7 +139,7 @@ CREATE_FACT_INTERACAO_CARONA_TABLE = """
 CREATE TABLE IF NOT EXISTS fato_interacao_carona (
     interaction_pk SERIAL PRIMARY KEY, -- Chave primária para o fato
     ride_user_id INT UNIQUE NOT NULL, -- Chave de negócio original da ride_user
-    ride_id INT NOT NULL, -- ID da carona a que se refere (pode ser FK para fato_carona.ride_id)
+    ride_sk INT NOT NULL, -- ID da carona a que se refere (FK para fato_carona.ride_sk)
     user_sk INT NOT NULL, -- Usuário que fez a interação (motorista ou caronista)
     date_sk INT NOT NULL,
     hour_sk INT NOT NULL, -- Para hora e minuto da interação
@@ -157,7 +156,8 @@ CREATE TABLE IF NOT EXISTS fato_interacao_carona (
     FOREIGN KEY (user_sk) REFERENCES dim_user(user_sk),
     -- A FK deve referenciar a combinação única (date_sk, hour_sk)
     FOREIGN KEY (date_sk, hour_sk) REFERENCES dim_time(date_sk, hour_sk),
-    FOREIGN KEY (status_sk) REFERENCES dim_status_pedido(status_sk)
+    FOREIGN KEY (status_sk) REFERENCES dim_status_pedido(status_sk),
+    FOREIGN KEY (ride_sk) REFERENCES fato_carona(ride_sk)
 );
 """
 

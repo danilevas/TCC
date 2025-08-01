@@ -129,7 +129,6 @@ def insert_all_unknown_dim_members(conn_dw):
         'car_plate': 'Desconhecido',
 
         'user_location': 'Desconhecido',
-        'cpf': 'Desconhecido',
         'app_platform': 'Desconhecido',
         'app_version': 'Desconhecido',
 

@@ -50,24 +50,33 @@ def etl_fact_interacao_carona(last_etl_run_date_str=None):
         ride_users_data['request_quit'] = (ride_users_data['status'] == 'quit')
 
         # Obter chaves substitutas das dimensões
+        dim_ride_map = pd.read_sql("SELECT ride_id, ride_sk FROM fato_carona;", conn_dw)
         dim_user_map = pd.read_sql("SELECT user_id, user_sk FROM dim_user;", conn_dw)
         dim_status_pedido_map = pd.read_sql("SELECT status_name, status_sk FROM dim_status_pedido;", conn_dw)
 
+        # Fazendo os merges
         ride_users_data = ride_users_data.merge(dim_user_map, left_on='user_id', right_on='user_id', how='left')
-        ride_users_data.rename(columns={'user_sk': 'user_sk_mapped'}, inplace=True)
-        ride_users_data['user_sk'] = ride_users_data['user_sk_mapped']
-        
         ride_users_data = ride_users_data.merge(dim_status_pedido_map, left_on='status', right_on='status_name', how='left')
-        ride_users_data.rename(columns={'status_sk': 'status_sk_mapped'}, inplace=True)
-        ride_users_data['status_sk'] = ride_users_data['status_sk_mapped']
+        ride_users_data = ride_users_data.merge(dim_ride_map, left_on='ride_id', right_on='ride_id', how='left')
+
+        # Convertendo para Int64 essas sks
+        ride_users_data['ride_sk'] = pd.to_numeric(ride_users_data['ride_sk'], errors='coerce').astype('Int64')
+        ride_users_data['user_sk'] = pd.to_numeric(ride_users_data['user_sk'], errors='coerce').astype('Int64')
+        ride_users_data['status_sk'] = pd.to_numeric(ride_users_data['status_sk'], errors='coerce').astype('Int64')
+
+        # Tratamento de SKs nulas após o merge (se houver IDs que não foram mapeados - assumindo -1 para sk desconhecido)
+        ride_users_data['ride_sk'].fillna(-1, inplace=True)
+        ride_users_data['user_sk'].fillna(-1, inplace=True)
+        ride_users_data['status_sk'].fillna(-1, inplace=True)
 
         # Limpar colunas temporárias e selecionar as finais
         final_fact_columns = [
-            'ride_user_id', 'ride_id', 'user_sk', 'date_sk', 'hour_sk', 'status_sk',
+            'ride_user_id', 'ride_sk', 'user_sk', 'date_sk', 'hour_sk', 'status_sk',
             'is_driver_interaction', 'is_passenger_request', 'request_accepted',
             'request_refused', 'request_pending', 'request_quit',
             'created_at', 'updated_at'
         ]
+
         # Garantir que as colunas SK não são nulas
         ride_users_data.dropna(subset=['user_sk', 'date_sk', 'hour_sk', 'status_sk'], inplace=True)
 
@@ -79,17 +88,17 @@ def etl_fact_interacao_carona(last_etl_run_date_str=None):
 
         insert_or_update_query = """
         INSERT INTO fato_interacao_carona (
-            ride_user_id, ride_id, user_sk, date_sk, hour_sk, status_sk,
+            ride_user_id, ride_sk, user_sk, date_sk, hour_sk, status_sk,
             is_driver_interaction, is_passenger_request, request_accepted,
             request_refused, request_pending, request_quit,
             created_at, updated_at
         ) VALUES (
-            %(ride_user_id)s, %(ride_id)s, %(user_sk)s, %(date_sk)s, %(hour_sk)s, %(status_sk)s,
+            %(ride_user_id)s, %(ride_sk)s, %(user_sk)s, %(date_sk)s, %(hour_sk)s, %(status_sk)s,
             %(is_driver_interaction)s, %(is_passenger_request)s, %(request_accepted)s,
             %(request_refused)s, %(request_pending)s, %(request_quit)s,
             %(created_at)s, %(updated_at)s
         ) ON CONFLICT (ride_user_id) DO UPDATE SET
-            ride_id = EXCLUDED.ride_id,
+            ride_sk = EXCLUDED.ride_sk,
             user_sk = EXCLUDED.user_sk,
             date_sk = EXCLUDED.date_sk,
             hour_sk = EXCLUDED.hour_sk,

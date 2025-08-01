@@ -183,8 +183,8 @@ def etl_fact_carona(last_etl_run_date_str=None):
 
         # Convertendo para Int64 essas sks
         rides_data['driver_user_sk'] = pd.to_numeric(rides_data['driver_user_sk'], errors='coerce').astype('Int64')
-        rides_data['neighborhood_sk'] = pd.to_numeric(rides_data['driver_user_sk'], errors='coerce').astype('Int64')
-        rides_data['hub_sk'] = pd.to_numeric(rides_data['driver_user_sk'], errors='coerce').astype('Int64')
+        rides_data['neighborhood_sk'] = pd.to_numeric(rides_data['neighborhood_sk'], errors='coerce').astype('Int64')
+        rides_data['hub_sk'] = pd.to_numeric(rides_data['hub_sk'], errors='coerce').astype('Int64')
 
         # Tratamento de SKs nulas após o merge (se houver IDs que não foram mapeados - assumindo -1 para sk desconhecido)
         rides_data['driver_user_sk'].fillna(-1, inplace=True)
