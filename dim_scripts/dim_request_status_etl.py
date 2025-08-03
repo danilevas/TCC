@@ -1,12 +1,12 @@
-# dim_scripts/dim_status_pedido_etl.py
+# dim_scripts/dim_request_status_etl.py
 from config import DB_DW
 from utils import connect_to_db
 from psycopg2.extras import execute_batch
 
-def etl_dim_status_pedido():
+def etl_dim_request_status():
     conn_dw = connect_to_db(DB_DW)
     if not conn_dw:
-        print("Erro de conexão. ETL DimStatusPedido abortado.")
+        print("Erro de conexão. ETL DimRequestStatus abortado.")
         return False
 
     try:
@@ -17,11 +17,11 @@ def etl_dim_status_pedido():
             'driver', 'pending', 'accepted', 'refused', 'quit'
         ]
         
-        print("Carregando dados na dim_status_pedido...")
+        print("Carregando dados na dim_request_status...")
         
         # Usar UPSERT para garantir que os status existam, mas não duplicar
         insert_or_update_query = """
-        INSERT INTO dim_status_pedido (status_name)
+        INSERT INTO dim_request_status (status_name)
         VALUES (%s)
         ON CONFLICT (status_name) DO NOTHING; -- Não atualiza se já existir
         """
@@ -31,11 +31,11 @@ def etl_dim_status_pedido():
         with conn_dw.cursor() as cur:
             execute_batch(cur, insert_or_update_query, data_to_load)
         conn_dw.commit()
-        print("Carga da dim_status_pedido concluída.")
+        print("Carga da dim_request_status concluída.")
         return True
 
     except Exception as e:
-        print(f"Erro no ETL da DimStatusPedido: {e}")
+        print(f"Erro no ETL da DimRequestStatus: {e}")
         return False
     finally:
         if conn_dw: conn_dw.close()

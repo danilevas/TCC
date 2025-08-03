@@ -10,13 +10,13 @@ from dim_scripts.dim_time_etl import etl_dim_time
 from dim_scripts.dim_user_etl import etl_dim_user
 from dim_scripts.dim_neighborhood_etl import etl_dim_neighborhood
 from dim_scripts.dim_hub_etl import etl_dim_hub
-from dim_scripts.dim_status_pedido_etl import etl_dim_status_pedido
-from dim_scripts.dim_flags_carona_etl import etl_dim_flags_carona
+from dim_scripts.dim_request_status_etl import etl_dim_request_status
+from dim_scripts.dim_ride_flags_etl import etl_dim_ride_flags
 
-from fact_scripts.fact_carona_etl import etl_fact_carona
-from fact_scripts.fact_interacao_carona_etl import etl_fact_interacao_carona
+from fact_scripts.fact_ride_etl import etl_fact_ride
+from fact_scripts.fact_ride_interaction_etl import etl_fact_ride_interaction
 
-from utils import connect_to_db, execute_sql, insert_unknown_dim_member
+from utils import connect_to_db, insert_unknown_dim_member
 from sql_queries import get_queries
 from config import DB_OLTP, DB_DW, LAST_RUN_FILE
 
@@ -36,7 +36,7 @@ def set_last_etl_run_date(dt):
     with open(LAST_RUN_FILE, 'w') as f:
         f.write(dt.strftime("%Y-%m-%d %H:%M:%S.%f"))
 
-def create_dw_tables(conn_dw, recria_dim_time, recria_dim_flags_carona):
+def create_dw_tables(conn_dw, recria_dim_time, recria_dim_ride_flags):
     """
     Dropa todas as tabelas existentes no DW e as recria.
     Isso garante um ambiente limpo para cada execução completa do ETL.
@@ -45,7 +45,7 @@ def create_dw_tables(conn_dw, recria_dim_time, recria_dim_flags_carona):
     print("Verificando e recriando tabelas do Data Warehouse...")
 
     # Retorna as queries de DDL baseado na configuração requisitada para as duas tabelas pré-populadas
-    DROP_QUERIES, CREATE_QUERIES = get_queries(recria_dim_time=recria_dim_time, recria_dim_flags_carona=recria_dim_flags_carona)
+    DROP_QUERIES, CREATE_QUERIES = get_queries(recria_dim_time=recria_dim_time, recria_dim_ride_flags=recria_dim_ride_flags)
     
     try:
         cur = conn_dw.cursor()
@@ -172,20 +172,20 @@ def insert_all_unknown_dim_members(conn_dw):
         print("Falha ao inserir membro 'Desconhecido' para dim_hub.")
         return False
 
-    # --- dim_status_pedido ---
-    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_status_pedido em sql_queries.py
-    dim_status_pedido_unknown_values = {
+    # --- dim_request_status ---
+    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_request_status em sql_queries.py
+    dim_request_status_unknown_values = {
         'status_sk': -1,
         'status_name': 'Desconhecido'
     }
-    if not insert_unknown_dim_member(conn_dw, 'dim_status_pedido', ['status_sk'], dim_status_pedido_unknown_values):
-        print("Falha ao inserir membro 'Desconhecido' para dim_status_pedido.")
+    if not insert_unknown_dim_member(conn_dw, 'dim_request_status', ['status_sk'], dim_request_status_unknown_values):
+        print("Falha ao inserir membro 'Desconhecido' para dim_request_status.")
         return False
     
-    # --- dim_flags_carona ---
-    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_flags_carona em sql_queries.py
-    dim_flags_carona_unknown_values = {
-        'flags_carona_sk': -1,
+    # --- dim_ride_flags ---
+    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_ride_flags em sql_queries.py
+    dim_ride_flags_unknown_values = {
+        'ride_flags_sk': -1,
         'is_routine_ride': False,
         'is_going_to_campus': False,
         'done': False,
@@ -198,14 +198,14 @@ def insert_all_unknown_dim_members(conn_dw):
         'is_routine_sunday': False,
         'flags_description': 'Desconhecido',
     }
-    if not insert_unknown_dim_member(conn_dw, 'dim_flags_carona', ['flags_carona_sk'], dim_flags_carona_unknown_values):
-        print("Falha ao inserir membro 'Desconhecido' para dim_flags_carona.")
+    if not insert_unknown_dim_member(conn_dw, 'dim_ride_flags', ['ride_flags_sk'], dim_ride_flags_unknown_values):
+        print("Falha ao inserir membro 'Desconhecido' para dim_ride_flags.")
         return False
 
     print("--- Todos os membros 'Desconhecidos' inseridos com sucesso ---")
     return True
 
-def main_etl_process(apaga_ultimo_etl_run, recria_dim_time, recria_dim_flags_carona):
+def main_etl_process(apaga_ultimo_etl_run, recria_dim_time, recria_dim_ride_flags):
     conn_oltp = None
     conn_dw = None
     try:
@@ -233,7 +233,7 @@ def main_etl_process(apaga_ultimo_etl_run, recria_dim_time, recria_dim_flags_car
         print("Conexões com os bancos de dados estabelecidas com sucesso.")
 
         # 1. Criar/Recriar tabelas do DW (Drop e Create)
-        if not create_dw_tables(conn_dw, recria_dim_time, recria_dim_flags_carona):
+        if not create_dw_tables(conn_dw, recria_dim_time, recria_dim_ride_flags):
             print("ETL abortado devido a falha na criação/recriação das tabelas do DW.")
             return # Sai da função se as tabelas não puderem ser criadas
 
@@ -257,21 +257,21 @@ def main_etl_process(apaga_ultimo_etl_run, recria_dim_time, recria_dim_flags_car
         if recria_dim_time:
             etl_dim_time()
         
-        # A dim_flags_carona só precisa ser carregada uma vez
-        if recria_dim_flags_carona:
-            etl_dim_flags_carona()
+        # A dim_ride_flags só precisa ser carregada uma vez
+        if recria_dim_ride_flags:
+            etl_dim_ride_flags()
         
         if not etl_dim_user(): print("ETL DimUser falhou.")
         if not etl_dim_neighborhood(): print("ETL DimNeighborhood falhou.")
         if not etl_dim_hub(): print("ETL DimHub falhou.")
-        if not etl_dim_status_pedido(): print("ETL DimStatusPedido falhou.")
+        if not etl_dim_request_status(): print("ETL DimRequestStatus falhou.")
         print("--- ETL das Dimensões Concluído ---")
 
         # 4. Executar ETL dos Fatos (Carga Incremental)
         print("\n--- Iniciando ETL dos Fatos (Incremental) ---")
         # Passar a data de last_run_date como string para a função
-        if not etl_fact_carona(last_run_date.strftime("%Y-%m-%d %H:%M:%S.%f")): print("ETL FatoCarona falhou.")
-        if not etl_fact_interacao_carona(last_run_date.strftime("%Y-%m-%d %H:%M:%S.%f")): print("ETL FatoInteracaoCarona falhou.")
+        if not etl_fact_ride(last_run_date.strftime("%Y-%m-%d %H:%M:%S.%f")): print("ETL FactRide falhou.")
+        if not etl_fact_ride_interaction(last_run_date.strftime("%Y-%m-%d %H:%M:%S.%f")): print("ETL FactRideInteraction falhou.")
         print("--- ETL dos Fatos Concluído ---")
 
         # 5. Atualizar a marca d'água da última execução
@@ -297,7 +297,7 @@ def main_etl_process(apaga_ultimo_etl_run, recria_dim_time, recria_dim_flags_car
 if __name__ == "__main__":
     # Para forçar uma carga completa (apaga o last_etl_run.txt e recarrega tudo):
     # Use isso quando quiser ter certeza que tudo está limpo e do zero.
-    main_etl_process(apaga_ultimo_etl_run=True, recria_dim_time=False, recria_dim_flags_carona=True)
+    main_etl_process(apaga_ultimo_etl_run=True, recria_dim_time=False, recria_dim_ride_flags=True)
 
     # Para uma carga normal (mantém o last_etl_run.txt e faz carga incremental):
-    # main_etl_process(apaga_ultimo_etl_run=False, recria_dim_time=False, recria_dim_flags_carona=True)
+    # main_etl_process(apaga_ultimo_etl_run=False, recria_dim_time=False, recria_dim_ride_flags=True)

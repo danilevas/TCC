@@ -1,29 +1,29 @@
-# fact_scripts/fact_carona_etl.py
+# fact_scripts/fact_ride_etl.py
 import pandas as pd
 from config import DB_OLTP, DB_DW
 from utils import connect_to_db, get_last_etl_run_date_se_houver
 from psycopg2.extras import execute_batch
 import numpy as np # Importar numpy para pd.NA
 
-from dim_scripts.dim_flags_carona_etl import load_flags_carona_lookup, derive_and_lookup_flags
+from dim_scripts.dim_ride_flags_etl import load_ride_flags_lookup, derive_and_lookup_flags
 
-def etl_fact_carona(last_etl_run_date_str=None):
+def etl_fact_ride(last_etl_run_date_str=None):
     conn_oltp = connect_to_db(DB_OLTP)
     conn_dw = connect_to_db(DB_DW)
 
     if not conn_oltp or not conn_dw:
-        print("Erro de conexão. ETL FatoCarona abortado.")
+        print("Erro de conexão. ETL FactRide abortado.")
         return False
 
     try:
-        # 0. Carregar a dim_flags_carona para lookup em memória
-        load_flags_carona_lookup(conn_dw)
+        # 0. Carregar a dim_ride_flags para lookup em memória
+        load_ride_flags_lookup(conn_dw)
 
         # Agora importamos o dicionário de lookup
-        from dim_scripts.dim_flags_carona_etl import _FLAGS_CARONA_LOOKUP_DICT
+        from dim_scripts.dim_ride_flags_etl import _RIDE_FLAGS_LOOKUP_DICT
 
-        if not _FLAGS_CARONA_LOOKUP_DICT:
-            print("Não foi possível carregar dim_flags_carona. ETL FatoCarona abortado.")
+        if not _RIDE_FLAGS_LOOKUP_DICT:
+            print("Não foi possível carregar dim_ride_flags. ETL FactRide abortado.")
             return False
         
         # Obter o último timestamp do DW para carga incremental
@@ -85,7 +85,7 @@ def etl_fact_carona(last_etl_run_date_str=None):
         print(f"Extraídas {len(rides_data)} caronas para processamento incremental.")
 
         if rides_data.empty and ride_users_agg_data.empty:
-            print("Nenhum dado novo ou atualizado para processar na fato_carona.")
+            print("Nenhum dado novo ou atualizado para processar na fact_ride.")
             return True # Não há dados para carregar, mas não é um erro
 
         # Gerar chaves de data/hora a partir das datas em que a carona estava marcada para ocorrer (da coluna date)
@@ -100,14 +100,14 @@ def etl_fact_carona(last_etl_run_date_str=None):
 
         # -------------------- FLAGS --------------------
 
-        print("Derivando flags e buscando flags_carona_sk...")
+        print("Derivando flags e buscando ride_flags_sk...")
         # A coluna 'is_routine_ride' do OLTP, 'week_days', 'description' e 'done'
         # são passadas para 'derive_and_lookup_flags' através do row_oltp.
-        rides_data['flags_carona_sk'] = rides_data.apply(derive_and_lookup_flags, axis=1)
+        rides_data['ride_flags_sk'] = rides_data.apply(derive_and_lookup_flags, axis=1)
         
         # Transformando a coluna em Int64
-        rides_data['flags_carona_sk'] = pd.to_numeric(rides_data['flags_carona_sk'], errors='coerce').astype('Int64')
-        print("Flags e flags_carona_sk processados.")
+        rides_data['ride_flags_sk'] = pd.to_numeric(rides_data['ride_flags_sk'], errors='coerce').astype('Int64')
+        print("Flags e ride_flags_sk processados.")
 
         # -------------------- PEDIDOS --------------------
 
@@ -195,7 +195,7 @@ def etl_fact_carona(last_etl_run_date_str=None):
 
         # Limpar colunas temporárias e selecionar as finais
         final_fact_columns = [
-            'ride_id', 'driver_user_sk', 'neighborhood_sk', 'hub_sk', 'date_sk', 'hour_sk', 'flags_carona_sk',
+            'ride_id', 'driver_user_sk', 'neighborhood_sk', 'hub_sk', 'date_sk', 'hour_sk', 'ride_flags_sk',
             'routine_id', 'slots', 'repeats_until',
             'requests_count', 'accepted_requests_count', 'refused_requests_count',
             'pending_requests_count', 'quit_requests_count', 'messages_count',
@@ -203,23 +203,23 @@ def etl_fact_carona(last_etl_run_date_str=None):
         ]
         
         # Garantir que as colunas SK não são nulas se as FKs não são opcionais (refletir se deixamos assim, mas acho que sim)
-        rides_data.dropna(subset=['driver_user_sk', 'neighborhood_sk', 'hub_sk', 'date_sk', 'hour_sk', 'flags_carona_sk'], inplace=True)
+        rides_data.dropna(subset=['driver_user_sk', 'neighborhood_sk', 'hub_sk', 'date_sk', 'hour_sk', 'ride_flags_sk'], inplace=True)
         
         fact_data_to_load = rides_data[final_fact_columns]
         fact_data_to_load = fact_data_to_load.replace({pd.NA: None, '': None})
 
         # 3. Carga (Load) no DW
-        print(f"Carregando {len(fact_data_to_load)} registros na fato_carona...")
+        print(f"Carregando {len(fact_data_to_load)} registros na fact_ride...")
         
         insert_or_update_query = """
-        INSERT INTO fato_carona (
-            ride_id, driver_user_sk, neighborhood_sk, hub_sk, date_sk, hour_sk, flags_carona_sk,
+        INSERT INTO fact_ride (
+            ride_id, driver_user_sk, neighborhood_sk, hub_sk, date_sk, hour_sk, ride_flags_sk,
             routine_id, slots, repeats_until,
             requests_count, accepted_requests_count, refused_requests_count,
             pending_requests_count, quit_requests_count, messages_count,
             created_at, updated_at, deleted_at
         ) VALUES (
-            %(ride_id)s, %(driver_user_sk)s, %(neighborhood_sk)s, %(hub_sk)s, %(date_sk)s, %(hour_sk)s, %(flags_carona_sk)s,
+            %(ride_id)s, %(driver_user_sk)s, %(neighborhood_sk)s, %(hub_sk)s, %(date_sk)s, %(hour_sk)s, %(ride_flags_sk)s,
             %(routine_id)s, %(slots)s, %(repeats_until)s,
             %(requests_count)s, %(accepted_requests_count)s, %(refused_requests_count)s,
             %(pending_requests_count)s, %(quit_requests_count)s, %(messages_count)s,
@@ -230,7 +230,7 @@ def etl_fact_carona(last_etl_run_date_str=None):
             hub_sk = EXCLUDED.hub_sk,
             date_sk = EXCLUDED.date_sk,
             hour_sk = EXCLUDED.hour_sk,
-            flags_carona_sk = EXCLUDED.flags_carona_sk,
+            ride_flags_sk = EXCLUDED.ride_flags_sk,
             routine_id = EXCLUDED.routine_id,
             slots = EXCLUDED.slots,
             repeats_until = EXCLUDED.repeats_until,
@@ -248,11 +248,11 @@ def etl_fact_carona(last_etl_run_date_str=None):
         with conn_dw.cursor() as cur:
             execute_batch(cur, insert_or_update_query, data_to_load_dicts)
         conn_dw.commit()
-        print("Carga da fato_carona concluída.")
+        print("Carga da fact_ride concluída.")
         return True
 
     except Exception as e:
-        print(f"Erro no ETL da FatoCarona: {e}")
+        print(f"Erro no ETL da FactRide: {e}")
         return False
     finally:
         if conn_oltp: conn_oltp.close()

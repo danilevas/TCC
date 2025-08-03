@@ -1,15 +1,15 @@
-# fact_scripts/fact_interacao_carona_etl.py
+# fact_scripts/fact_ride_interaction_etl.py
 import pandas as pd
 from config import DB_OLTP, DB_DW
 from utils import connect_to_db, get_last_etl_run_date_se_houver
 from psycopg2.extras import execute_batch
 
-def etl_fact_interacao_carona(last_etl_run_date_str=None):
+def etl_fact_ride_interaction(last_etl_run_date_str=None):
     conn_oltp = connect_to_db(DB_OLTP)
     conn_dw = connect_to_db(DB_DW)
 
     if not conn_oltp or not conn_dw:
-        print("Erro de conexão. ETL FatoInteracaoCarona abortado.")
+        print("Erro de conexão. ETL FatoRideInteraction abortado.")
         return False
 
     try:
@@ -34,7 +34,7 @@ def etl_fact_interacao_carona(last_etl_run_date_str=None):
         print(f"Extraídas {len(ride_users_data)} interações de carona para processamento incremental.")
 
         if ride_users_data.empty:
-            print("Nenhum dado novo ou atualizado para processar na fato_interacao_carona.")
+            print("Nenhum dado novo ou atualizado para processar na fato_ride_interaction.")
             return True
 
         # 2. Transformação (Transform)
@@ -52,11 +52,11 @@ def etl_fact_interacao_carona(last_etl_run_date_str=None):
         # Obter chaves substitutas das dimensões
         dim_ride_map = pd.read_sql("SELECT ride_id, ride_sk FROM fato_carona;", conn_dw)
         dim_user_map = pd.read_sql("SELECT user_id, user_sk FROM dim_user;", conn_dw)
-        dim_status_pedido_map = pd.read_sql("SELECT status_name, status_sk FROM dim_status_pedido;", conn_dw)
+        dim_request_status_map = pd.read_sql("SELECT status_name, status_sk FROM dim_request_status;", conn_dw)
 
         # Fazendo os merges
         ride_users_data = ride_users_data.merge(dim_user_map, left_on='user_id', right_on='user_id', how='left')
-        ride_users_data = ride_users_data.merge(dim_status_pedido_map, left_on='status', right_on='status_name', how='left')
+        ride_users_data = ride_users_data.merge(dim_request_status_map, left_on='status', right_on='status_name', how='left')
         ride_users_data = ride_users_data.merge(dim_ride_map, left_on='ride_id', right_on='ride_id', how='left')
 
         # Convertendo para Int64 essas sks
@@ -84,10 +84,10 @@ def etl_fact_interacao_carona(last_etl_run_date_str=None):
         fact_data_to_load = fact_data_to_load.replace({pd.NA: None, '': None})
 
         # 3. Carga (Load) no DW
-        print(f"Carregando {len(fact_data_to_load)} registros na fato_interacao_carona...")
+        print(f"Carregando {len(fact_data_to_load)} registros na fato_ride_interaction...")
 
         insert_or_update_query = """
-        INSERT INTO fato_interacao_carona (
+        INSERT INTO fato_ride_interaction (
             ride_user_id, ride_sk, user_sk, date_sk, hour_sk, status_sk,
             is_driver_interaction, is_passenger_request, request_accepted,
             request_refused, request_pending, request_quit,
@@ -116,11 +116,11 @@ def etl_fact_interacao_carona(last_etl_run_date_str=None):
         with conn_dw.cursor() as cur:
             execute_batch(cur, insert_or_update_query, data_to_load_dicts)
         conn_dw.commit()
-        print("Carga da fato_interacao_carona concluída.")
+        print("Carga da fato_ride_interaction concluída.")
         return True
 
     except Exception as e:
-        print(f"Erro no ETL da FatoInteracaoCarona: {e}")
+        print(f"Erro no ETL da FatoRideInteraction: {e}")
         return False
     finally:
         if conn_oltp: conn_oltp.close()
