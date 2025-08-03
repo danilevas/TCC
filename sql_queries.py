@@ -1,8 +1,8 @@
 # sql_queries.py
 
 # DDLs para as tabelas de dimensão
-CREATE_DIM_TIME_TABLE = """
-CREATE TABLE IF NOT EXISTS dim_time (
+CREATE_DIM_DATE_TABLE = """
+CREATE TABLE IF NOT EXISTS dim_date (
     date_sk INT NOT NULL,
     full_date DATE NOT NULL,
     day_of_week INT NOT NULL,
@@ -12,14 +12,19 @@ CREATE TABLE IF NOT EXISTS dim_time (
     month_name VARCHAR(20) NOT NULL,
     semester INT NOT NULL,
     year INT NOT NULL,
+
+    PRIMARY KEY (date_sk)
+);
+"""
+
+CREATE_DIM_HOUR_TABLE = """
+CREATE TABLE IF NOT EXISTS dim_hour (
     hour_sk INT NOT NULL,
     hour_of_day INT NOT NULL,
     minute_of_hour INT NOT NULL,
     time_of_day_bucket VARCHAR(50) NOT NULL,
-    -- Adicione uma restrição de unicidade para a combinação (date_sk, hour_sk)
-    -- Isso torna a combinação única, permitindo que seja referenciada por FK
-    PRIMARY KEY (date_sk, hour_sk)
-    -- UNIQUE (date_sk, hour_sk)
+
+    PRIMARY KEY (hour_sk)
 );
 """
 
@@ -93,6 +98,7 @@ CREATE TABLE IF NOT EXISTS dim_ride (
     repeats_until TIMESTAMP,
     created_at TIMESTAMP, -- Para controle do ETL, marca d'água
     updated_at TIMESTAMP, -- Para controle do ETL, marca d'água
+    occurred_at TIMESTAMP, -- Descritivo
     deleted_at TIMESTAMP -- Para controle do ETL, marca d'água
 );
 """
@@ -119,13 +125,19 @@ CREATE TABLE IF NOT EXISTS dim_ride_flags (
 CREATE_FACT_RIDE_TABLE = """
 CREATE TABLE IF NOT EXISTS fact_ride (
     ride_pk SERIAL PRIMARY KEY, -- Chave primária para o fato
-    ride_sk INT NOT NULL,
+    ride_sk INT UNIQUE NOT NULL,
     driver_user_sk INT NOT NULL,
     neighborhood_sk INT NOT NULL,
     hub_sk INT NOT NULL,
-    date_sk INT NOT NULL,
-    hour_sk INT NOT NULL,
     ride_flags_sk INT NOT NULL,
+
+    -- SKs para o momento de CRIAÇÃO da carona
+    creation_date_sk INT NOT NULL,
+    creation_hour_sk INT NOT NULL,
+
+    -- SKs para o momento de OCORRÊNCIA da carona
+    occurrence_date_sk INT NOT NULL,
+    occurrence_hour_sk INT NOT NULL,
 
     slots INT,
     requests_count INT DEFAULT 0,
@@ -135,46 +147,66 @@ CREATE TABLE IF NOT EXISTS fact_ride (
     quit_requests_count INT DEFAULT 0,
     messages_count INT DEFAULT 0,
 
+    -- FKs 
     FOREIGN KEY (ride_sk) REFERENCES dim_ride(ride_sk),
     FOREIGN KEY (driver_user_sk) REFERENCES dim_user(user_sk),
     FOREIGN KEY (neighborhood_sk) REFERENCES dim_neighborhood(neighborhood_sk),
     FOREIGN KEY (hub_sk) REFERENCES dim_hub(hub_sk),
-    -- A FK deve referenciar a combinação única (date_sk, hour_sk)
-    FOREIGN KEY (date_sk, hour_sk) REFERENCES dim_time(date_sk, hour_sk)
-    FOREIGN KEY (ride_flags_sk) REFERENCES dim_ride_flags(ride_flags_sk)
+    FOREIGN KEY (ride_flags_sk) REFERENCES dim_ride_flags(ride_flags_sk),
+
+    -- FKs para as dimensões de tempo
+    FOREIGN KEY (creation_date_sk) REFERENCES dim_date(date_sk),
+    FOREIGN KEY (creation_hour_sk) REFERENCES dim_hour(hour_sk),
+    FOREIGN KEY (occurrence_date_sk) REFERENCES dim_date(date_sk),
+    FOREIGN KEY (occurrence_hour_sk) REFERENCES dim_hour(hour_sk)
 );
 """
 
 CREATE_FACT_RIDE_INTERACTION_TABLE = """
-CREATE TABLE IF NOT EXISTS fato_interacao_carona (
+CREATE TABLE IF NOT EXISTS fact_ride_interaction (
     interaction_pk SERIAL PRIMARY KEY, -- Chave primária para o fato
     ride_user_id INT UNIQUE NOT NULL, -- Chave de negócio original da ride_user
+
     ride_sk INT NOT NULL, -- ID da carona a que se refere (FK para dim_ride.ride_sk)
     user_sk INT NOT NULL, -- Usuário que fez a interação (motorista ou caronista)
-    date_sk INT NOT NULL,
-    hour_sk INT NOT NULL, -- Para hora e minuto da interação
     status_sk INT NOT NULL, -- Status final da interação
+
+    -- SKs para o momento de CRIAÇÃO da interação
+    creation_date_sk INT NOT NULL,
+    creation_hour_sk INT NOT NULL,
+
+    -- SKs para o momento de ATUALIZAÇÃO da interação
+    update_date_sk INT NOT NULL,
+    update_hour_sk INT NOT NULL,
+
     is_driver_interaction BOOLEAN NOT NULL,
     is_passenger_request BOOLEAN NOT NULL,
     request_accepted BOOLEAN NOT NULL,
     request_refused BOOLEAN NOT NULL,
     request_pending BOOLEAN NOT NULL,
     request_quit BOOLEAN NOT NULL,
+
     created_at TIMESTAMP, -- Para controle do ETL, marca d'água
     updated_at TIMESTAMP, -- Para controle do ETL, marca d'água
 
+    -- FKs
+    FOREIGN KEY (ride_sk) REFERENCES dim_ride(ride_sk),
     FOREIGN KEY (user_sk) REFERENCES dim_user(user_sk),
-    -- A FK deve referenciar a combinação única (date_sk, hour_sk)
-    FOREIGN KEY (date_sk, hour_sk) REFERENCES dim_time(date_sk, hour_sk),
     FOREIGN KEY (status_sk) REFERENCES dim_request_status(status_sk),
-    FOREIGN KEY (ride_sk) REFERENCES dim_ride(ride_sk)
+    
+    -- FKs para as dimensões de tempo
+    FOREIGN KEY (creation_date_sk) REFERENCES dim_date(date_sk),
+    FOREIGN KEY (creation_hour_sk) REFERENCES dim_hour(hour_sk),
+    FOREIGN KEY (update_date_sk) REFERENCES dim_date(date_sk),
+    FOREIGN KEY (update_hour_sk) REFERENCES dim_hour(hour_sk)
 );
 """
 
 # DDL - DROP TABLES (em ordem para evitar problemas de dependência)
 DROP_FACT_RIDE_TABLE = "DROP TABLE IF EXISTS fact_ride CASCADE;"
-DROP_FACT_RIDE_INTERACTION_TABLE = "DROP TABLE IF EXISTS fato_interacao_carona CASCADE;"
-DROP_DIM_TIME_TABLE = "DROP TABLE IF EXISTS dim_time CASCADE;"
+DROP_FACT_RIDE_INTERACTION_TABLE = "DROP TABLE IF EXISTS fact_ride_interaction CASCADE;"
+DROP_DIM_DATE_TABLE = "DROP TABLE IF EXISTS dim_date CASCADE;"
+DROP_DIM_HOUR_TABLE = "DROP TABLE IF EXISTS dim_hour CASCADE;"
 DROP_DIM_USER_TABLE = "DROP TABLE IF EXISTS dim_user CASCADE;"
 DROP_DIM_NEIGHBORHOOD_TABLE = "DROP TABLE IF EXISTS dim_neighborhood CASCADE;"
 DROP_DIM_HUB_TABLE = "DROP TABLE IF EXISTS dim_hub CASCADE;"
@@ -185,7 +217,8 @@ DROP_DIM_RIDE_FLAGS_TABLE = "DROP TABLE IF EXISTS dim_ride_flags CASCADE;"
 ALL_DDL_DROP_QUERIES = [
     DROP_FACT_RIDE_TABLE,
     DROP_FACT_RIDE_INTERACTION_TABLE,
-    DROP_DIM_TIME_TABLE,
+    DROP_DIM_DATE_TABLE,
+    DROP_DIM_HOUR_TABLE,
     DROP_DIM_USER_TABLE,
     DROP_DIM_NEIGHBORHOOD_TABLE,
     DROP_DIM_HUB_TABLE,
@@ -195,7 +228,8 @@ ALL_DDL_DROP_QUERIES = [
 ]
 
 ALL_DDL_CREATE_QUERIES = [
-    CREATE_DIM_TIME_TABLE,
+    CREATE_DIM_DATE_TABLE,
+    CREATE_DIM_HOUR_TABLE,
     CREATE_DIM_USER_TABLE,
     CREATE_DIM_NEIGHBORHOOD_TABLE,
     CREATE_DIM_HUB_TABLE,
@@ -207,11 +241,14 @@ ALL_DDL_CREATE_QUERIES = [
 ]
 
 # Retorna as queries de DDL corretamente
-def get_queries(recria_dim_time, recria_dim_ride_flags):
-    # Se não quisermos recriar a tabela dim_time, não a dropamos nem a criamos
-    if not recria_dim_time:
-        ALL_DDL_DROP_QUERIES.remove(DROP_DIM_TIME_TABLE)
-        ALL_DDL_CREATE_QUERIES.remove(CREATE_DIM_TIME_TABLE)
+def get_queries(recria_dims_de_tempo, recria_dim_ride_flags):
+    # Se não quisermos recriar as tabelas temporais, não a dropamos nem a criamos
+    if not recria_dims_de_tempo:
+        ALL_DDL_DROP_QUERIES.remove(DROP_DIM_DATE_TABLE)
+        ALL_DDL_DROP_QUERIES.remove(DROP_DIM_HOUR_TABLE)
+
+        ALL_DDL_CREATE_QUERIES.remove(CREATE_DIM_DATE_TABLE)
+        ALL_DDL_CREATE_QUERIES.remove(CREATE_DIM_HOUR_TABLE)
     
     # Se não quisermos recriar a tabela dim_ride_flags, não a dropamos nem a criamos
     if not recria_dim_ride_flags:

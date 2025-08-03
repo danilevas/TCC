@@ -52,10 +52,10 @@ def get_latest_timestamp(conn_dw, table_name, timestamp_column):
         print(f"Erro ao obter o último timestamp para {table_name}: {e}")
         return None
 
-def get_last_etl_run_date_se_houver(conn_dw, last_etl_run_date_str):
+def get_last_etl_run_date_se_houver(conn_dw, last_etl_run_date_str, table_name):
     # Se last_etl_run_date_str não for fornecido, tenta buscar no DW
     if not last_etl_run_date_str:
-        last_etl_run_date = get_latest_timestamp(conn_dw, 'fato_carona', 'updated_at')
+        last_etl_run_date = get_latest_timestamp(conn_dw, table_name, 'updated_at')
         if last_etl_run_date is None:
             last_etl_run_date = datetime(2000, 1, 1) # Data bem antiga para primeira carga
         else:

@@ -1,16 +1,18 @@
 # etl_main.py
-from datetime import datetime, timedelta
+from datetime import datetime
 import os
 import sys
 
 # Adiciona o diretório raiz do projeto ao PATH para importações relativas
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from dim_scripts.dim_time_etl import etl_dim_time
+from dim_scripts.dim_date_etl import etl_dim_date
+from dim_scripts.dim_hour_etl import etl_dim_hour
 from dim_scripts.dim_user_etl import etl_dim_user
 from dim_scripts.dim_neighborhood_etl import etl_dim_neighborhood
 from dim_scripts.dim_hub_etl import etl_dim_hub
 from dim_scripts.dim_request_status_etl import etl_dim_request_status
+from dim_scripts.dim_ride_etl import etl_dim_ride
 from dim_scripts.dim_ride_flags_etl import etl_dim_ride_flags
 
 from fact_scripts.fact_ride_etl import etl_fact_ride
@@ -36,7 +38,7 @@ def set_last_etl_run_date(dt):
     with open(LAST_RUN_FILE, 'w') as f:
         f.write(dt.strftime("%Y-%m-%d %H:%M:%S.%f"))
 
-def create_dw_tables(conn_dw, recria_dim_time, recria_dim_ride_flags):
+def create_dw_tables(conn_dw, recria_dims_de_tempo, recria_dim_ride_flags):
     """
     Dropa todas as tabelas existentes no DW e as recria.
     Isso garante um ambiente limpo para cada execução completa do ETL.
@@ -45,7 +47,7 @@ def create_dw_tables(conn_dw, recria_dim_time, recria_dim_ride_flags):
     print("Verificando e recriando tabelas do Data Warehouse...")
 
     # Retorna as queries de DDL baseado na configuração requisitada para as duas tabelas pré-populadas
-    DROP_QUERIES, CREATE_QUERIES = get_queries(recria_dim_time=recria_dim_time, recria_dim_ride_flags=recria_dim_ride_flags)
+    DROP_QUERIES, CREATE_QUERIES = get_queries(recria_dims_de_tempo=recria_dims_de_tempo, recria_dim_ride_flags=recria_dim_ride_flags)
     
     try:
         cur = conn_dw.cursor()
@@ -92,9 +94,9 @@ def insert_all_unknown_dim_members(conn_dw):
     """
     print("\n--- Inserindo membros 'Desconhecidos' nas Dimensões ---")
 
-    # --- dim_time ---
-    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_time em sql_queries.py
-    dim_time_unknown_values = {
+    # --- dim_date ---
+    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_date em sql_queries.py
+    dim_date_unknown_values = {
         'date_sk': -1,
         'full_date': '1900-01-01',
         'day_of_week': 0,
@@ -103,14 +105,22 @@ def insert_all_unknown_dim_members(conn_dw):
         'month': 0,
         'month_name': 'Desconhecido',
         'semester': 0,
-        'year': 0,
+        'year': 0
+    }
+    if not insert_unknown_dim_member(conn_dw, 'dim_date', ['date_sk'], dim_date_unknown_values):
+        print("Falha ao inserir membro 'Desconhecido' para dim_date.")
+        return False
+
+    # --- dim_hour ---
+    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_hour em sql_queries.py
+    dim_hour_unknown_values = {
         'hour_sk': -1,
         'hour_of_day': -1,
         'minute_of_hour': -1,
         'time_of_day_bucket': 'Desconhecido'
     }
-    if not insert_unknown_dim_member(conn_dw, 'dim_time', ['date_sk', 'hour_sk'], dim_time_unknown_values):
-        print("Falha ao inserir membro 'Desconhecido' para dim_time.")
+    if not insert_unknown_dim_member(conn_dw, 'dim_hour', ['hour_sk'], dim_hour_unknown_values):
+        print("Falha ao inserir membro 'Desconhecido' para dim_hour.")
         return False
 
     # --- dim_user ---
@@ -181,7 +191,23 @@ def insert_all_unknown_dim_members(conn_dw):
     if not insert_unknown_dim_member(conn_dw, 'dim_request_status', ['status_sk'], dim_request_status_unknown_values):
         print("Falha ao inserir membro 'Desconhecido' para dim_request_status.")
         return False
-    
+
+    # --- dim_ride ---
+    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_ride em sql_queries.py
+    dim_ride_unknown_values = {
+        'ride_sk': -1,
+        'ride_id': -1,
+        'routine_id': -1,
+        'repeats_until': '1900-01-01',
+        'created_at': '1900-01-01',
+        'updated_at': '1900-01-01',
+        'occurred_at': '1900-01-01',
+        'deleted_at': '1900-01-01'
+    }
+    if not insert_unknown_dim_member(conn_dw, 'dim_ride', ['ride_sk'], dim_ride_unknown_values):
+        print("Falha ao inserir membro 'Desconhecido' para dim_ride.")
+        return False
+
     # --- dim_ride_flags ---
     # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_ride_flags em sql_queries.py
     dim_ride_flags_unknown_values = {
@@ -205,7 +231,7 @@ def insert_all_unknown_dim_members(conn_dw):
     print("--- Todos os membros 'Desconhecidos' inseridos com sucesso ---")
     return True
 
-def main_etl_process(apaga_ultimo_etl_run, recria_dim_time, recria_dim_ride_flags):
+def main_etl_process(apaga_ultimo_etl_run, recria_dims_de_tempo, recria_dim_ride_flags):
     conn_oltp = None
     conn_dw = None
     try:
@@ -233,7 +259,7 @@ def main_etl_process(apaga_ultimo_etl_run, recria_dim_time, recria_dim_ride_flag
         print("Conexões com os bancos de dados estabelecidas com sucesso.")
 
         # 1. Criar/Recriar tabelas do DW (Drop e Create)
-        if not create_dw_tables(conn_dw, recria_dim_time, recria_dim_ride_flags):
+        if not create_dw_tables(conn_dw, recria_dims_de_tempo, recria_dim_ride_flags):
             print("ETL abortado devido a falha na criação/recriação das tabelas do DW.")
             return # Sai da função se as tabelas não puderem ser criadas
 
@@ -253,9 +279,10 @@ def main_etl_process(apaga_ultimo_etl_run, recria_dim_time, recria_dim_ride_flag
         # 3. Executar ETL das Dimensões
         print("\n--- Iniciando ETL das Dimensões ---")
 
-        # A dim_time geralmente só precisa ser carregada uma vez ou quando estender o período
-        if recria_dim_time:
-            etl_dim_time()
+        # As dimensões temporais geralmente só precisam ser carregadas uma vez ou quando estender o período
+        if recria_dims_de_tempo:
+            etl_dim_date()
+            etl_dim_hour()
         
         # A dim_ride_flags só precisa ser carregada uma vez
         if recria_dim_ride_flags:
@@ -265,6 +292,7 @@ def main_etl_process(apaga_ultimo_etl_run, recria_dim_time, recria_dim_ride_flag
         if not etl_dim_neighborhood(): print("ETL DimNeighborhood falhou.")
         if not etl_dim_hub(): print("ETL DimHub falhou.")
         if not etl_dim_request_status(): print("ETL DimRequestStatus falhou.")
+        if not etl_dim_ride(): print("ETL DimRide falhou.")
         print("--- ETL das Dimensões Concluído ---")
 
         # 4. Executar ETL dos Fatos (Carga Incremental)
@@ -297,7 +325,7 @@ def main_etl_process(apaga_ultimo_etl_run, recria_dim_time, recria_dim_ride_flag
 if __name__ == "__main__":
     # Para forçar uma carga completa (apaga o last_etl_run.txt e recarrega tudo):
     # Use isso quando quiser ter certeza que tudo está limpo e do zero.
-    main_etl_process(apaga_ultimo_etl_run=True, recria_dim_time=False, recria_dim_ride_flags=True)
+    main_etl_process(apaga_ultimo_etl_run=True, recria_dims_de_tempo=True, recria_dim_ride_flags=True)
 
     # Para uma carga normal (mantém o last_etl_run.txt e faz carga incremental):
-    # main_etl_process(apaga_ultimo_etl_run=False, recria_dim_time=False, recria_dim_ride_flags=True)
+    # main_etl_process(apaga_ultimo_etl_run=False, recria_dims_de_tempo=False, recria_dim_ride_flags=True)

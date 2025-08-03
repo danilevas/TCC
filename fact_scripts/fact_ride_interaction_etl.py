@@ -9,12 +9,12 @@ def etl_fact_ride_interaction(last_etl_run_date_str=None):
     conn_dw = connect_to_db(DB_DW)
 
     if not conn_oltp or not conn_dw:
-        print("Erro de conexão. ETL FatoRideInteraction abortado.")
+        print("Erro de conexão. ETL FactRideInteraction abortado.")
         return False
 
     try:
         # Obter o último timestamp do DW para carga incremental
-        last_etl_run_date = get_last_etl_run_date_se_houver(conn_dw, last_etl_run_date_str)
+        last_etl_run_date = get_last_etl_run_date_se_houver(conn_dw, last_etl_run_date_str, 'fact_ride_interaction')
 
         print(f"Extraindo dados de ride_user. A partir de: {last_etl_run_date}")
 
@@ -34,12 +34,18 @@ def etl_fact_ride_interaction(last_etl_run_date_str=None):
         print(f"Extraídas {len(ride_users_data)} interações de carona para processamento incremental.")
 
         if ride_users_data.empty:
-            print("Nenhum dado novo ou atualizado para processar na fato_ride_interaction.")
+            print("Nenhum dado novo ou atualizado para processar na fact_ride_interaction.")
             return True
 
         # 2. Transformação (Transform)
-        ride_users_data['date_sk'] = pd.to_datetime(ride_users_data['created_at']).dt.strftime('%Y%m%d').astype(int)
-        ride_users_data['hour_sk'] = pd.to_datetime(ride_users_data['created_at']).dt.strftime('%H%M').astype(int)
+
+        # Gerar chaves de data/hora a partir da data e hora em que o pedido foi criado (da coluna created_at)
+        ride_users_data['creation_date_sk'] = pd.to_datetime(ride_users_data['created_at']).dt.strftime('%Y%m%d').astype('Int64')
+        ride_users_data['creation_hour_sk'] = pd.to_datetime(ride_users_data['created_at']).dt.strftime('%H%M').astype('Int64')
+
+        # Gerar chaves de data/hora a partir da data e hora em que o pedido foi atualizado (da coluna updated_at)
+        ride_users_data['update_date_sk'] = pd.to_datetime(ride_users_data['updated_at']).dt.strftime('%Y%m%d').astype('Int64')
+        ride_users_data['update_hour_sk'] = pd.to_datetime(ride_users_data['updated_at']).dt.strftime('%H%M').astype('Int64')
 
         # Criar as colunas booleanas de status
         ride_users_data['is_driver_interaction'] = (ride_users_data['status'] == 'driver')
@@ -50,7 +56,7 @@ def etl_fact_ride_interaction(last_etl_run_date_str=None):
         ride_users_data['request_quit'] = (ride_users_data['status'] == 'quit')
 
         # Obter chaves substitutas das dimensões
-        dim_ride_map = pd.read_sql("SELECT ride_id, ride_sk FROM fato_carona;", conn_dw)
+        dim_ride_map = pd.read_sql("SELECT ride_id, ride_sk FROM dim_ride;", conn_dw)
         dim_user_map = pd.read_sql("SELECT user_id, user_sk FROM dim_user;", conn_dw)
         dim_request_status_map = pd.read_sql("SELECT status_name, status_sk FROM dim_request_status;", conn_dw)
 
@@ -71,44 +77,55 @@ def etl_fact_ride_interaction(last_etl_run_date_str=None):
 
         # Limpar colunas temporárias e selecionar as finais
         final_fact_columns = [
-            'ride_user_id', 'ride_sk', 'user_sk', 'date_sk', 'hour_sk', 'status_sk',
+            'ride_user_id', 'ride_sk', 'user_sk', 'status_sk',
+            'creation_date_sk', 'creation_hour_sk', 'update_date_sk', 'update_hour_sk',
             'is_driver_interaction', 'is_passenger_request', 'request_accepted',
             'request_refused', 'request_pending', 'request_quit',
             'created_at', 'updated_at'
         ]
 
         # Garantir que as colunas SK não são nulas
-        ride_users_data.dropna(subset=['user_sk', 'date_sk', 'hour_sk', 'status_sk'], inplace=True)
+        ride_users_data.dropna(subset=['ride_sk', 'user_sk', 'status_sk',
+                                       'creation_date_sk', 'creation_hour_sk', 'update_date_sk', 'update_hour_sk'], inplace=True)
 
         fact_data_to_load = ride_users_data[final_fact_columns]
         fact_data_to_load = fact_data_to_load.replace({pd.NA: None, '': None})
 
         # 3. Carga (Load) no DW
-        print(f"Carregando {len(fact_data_to_load)} registros na fato_ride_interaction...")
+        print(f"Carregando {len(fact_data_to_load)} registros na fact_ride_interaction...")
 
         insert_or_update_query = """
-        INSERT INTO fato_ride_interaction (
-            ride_user_id, ride_sk, user_sk, date_sk, hour_sk, status_sk,
+        INSERT INTO fact_ride_interaction (
+            ride_user_id, ride_sk, user_sk, status_sk,
+            creation_date_sk, creation_hour_sk, update_date_sk, update_hour_sk,
             is_driver_interaction, is_passenger_request, request_accepted,
             request_refused, request_pending, request_quit,
             created_at, updated_at
         ) VALUES (
-            %(ride_user_id)s, %(ride_sk)s, %(user_sk)s, %(date_sk)s, %(hour_sk)s, %(status_sk)s,
+            %(ride_user_id)s, %(ride_sk)s, %(user_sk)s, %(status_sk)s,
+            %(creation_date_sk)s, %(creation_hour_sk)s, %(update_date_sk)s, %(update_hour_sk)s,
             %(is_driver_interaction)s, %(is_passenger_request)s, %(request_accepted)s,
             %(request_refused)s, %(request_pending)s, %(request_quit)s,
             %(created_at)s, %(updated_at)s
         ) ON CONFLICT (ride_user_id) DO UPDATE SET
             ride_sk = EXCLUDED.ride_sk,
             user_sk = EXCLUDED.user_sk,
-            date_sk = EXCLUDED.date_sk,
-            hour_sk = EXCLUDED.hour_sk,
             status_sk = EXCLUDED.status_sk,
+            
+            creation_date_sk = EXCLUDED.creation_date_sk,
+            creation_hour_sk = EXCLUDED.creation_hour_sk,
+
+            update_date_sk = EXCLUDED.update_date_sk,
+            update_hour_sk = EXCLUDED.update_hour_sk,
+
             is_driver_interaction = EXCLUDED.is_driver_interaction,
             is_passenger_request = EXCLUDED.is_passenger_request,
             request_accepted = EXCLUDED.request_accepted,
             request_refused = EXCLUDED.request_refused,
             request_pending = EXCLUDED.request_pending,
             request_quit = EXCLUDED.request_quit,
+
+            created_at = EXCLUDED.created_at,
             updated_at = EXCLUDED.updated_at
         """
         data_to_load_dicts = fact_data_to_load.to_dict(orient='records')
@@ -116,11 +133,11 @@ def etl_fact_ride_interaction(last_etl_run_date_str=None):
         with conn_dw.cursor() as cur:
             execute_batch(cur, insert_or_update_query, data_to_load_dicts)
         conn_dw.commit()
-        print("Carga da fato_ride_interaction concluída.")
+        print("Carga da fact_ride_interaction concluída.")
         return True
 
     except Exception as e:
-        print(f"Erro no ETL da FatoRideInteraction: {e}")
+        print(f"Erro no ETL da FactRideInteraction: {e}")
         return False
     finally:
         if conn_oltp: conn_oltp.close()
