@@ -38,7 +38,7 @@ def set_last_etl_run_date(dt):
     with open(LAST_RUN_FILE, 'w') as f:
         f.write(dt.strftime("%Y-%m-%d %H:%M:%S.%f"))
 
-def create_dw_tables(conn_dw, recria_dims_de_tempo, recria_dim_ride_flags):
+def create_dw_tables(conn_dw):
     """
     Dropa todas as tabelas existentes no DW e as recria.
     Isso garante um ambiente limpo para cada execução completa do ETL.
@@ -47,7 +47,7 @@ def create_dw_tables(conn_dw, recria_dims_de_tempo, recria_dim_ride_flags):
     print("Verificando e recriando tabelas do Data Warehouse...")
 
     # Retorna as queries de DDL baseado na configuração requisitada para as duas tabelas pré-populadas
-    DROP_QUERIES, CREATE_QUERIES = get_queries(recria_dims_de_tempo=recria_dims_de_tempo, recria_dim_ride_flags=recria_dim_ride_flags)
+    DROP_QUERIES, CREATE_QUERIES = get_queries()
     
     try:
         cur = conn_dw.cursor()
@@ -105,6 +105,7 @@ def insert_all_unknown_dim_members(conn_dw):
         'month': 0,
         'month_name': 'Desconhecido',
         'semester': 0,
+        'period': 'Desconhecido',
         'year': 0
     }
     if not insert_unknown_dim_member(conn_dw, 'dim_date', ['date_sk'], dim_date_unknown_values):
@@ -128,7 +129,6 @@ def insert_all_unknown_dim_members(conn_dw):
     dim_user_unknown_values = {
         'user_sk': -1,
         'user_id': -1,
-        'user_name': 'Desconhecido',
         'profile': 'Desconhecido',
         'course': 'Desconhecido',
         'phone_number': 'Desconhecido',
@@ -231,14 +231,14 @@ def insert_all_unknown_dim_members(conn_dw):
     print("--- Todos os membros 'Desconhecidos' inseridos com sucesso ---")
     return True
 
-def main_etl_process(apaga_ultimo_etl_run, recria_dims_de_tempo, recria_dim_ride_flags):
+def main_etl_process(carga_completa):
     conn_oltp = None
     conn_dw = None
     try:
         print("Iniciando processo ETL para Caronaê DW...")
 
         # 0. Apaga o last_etl_run.txt se o parâmetro for True
-        if apaga_ultimo_etl_run:
+        if carga_completa:
             if os.path.exists(LAST_RUN_FILE):
                 os.remove(LAST_RUN_FILE)
                 print(f"Arquivo '{LAST_RUN_FILE}' apagado (reset de carga incremental).")
@@ -259,7 +259,7 @@ def main_etl_process(apaga_ultimo_etl_run, recria_dims_de_tempo, recria_dim_ride
         print("Conexões com os bancos de dados estabelecidas com sucesso.")
 
         # 1. Criar/Recriar tabelas do DW (Drop e Create)
-        if not create_dw_tables(conn_dw, recria_dims_de_tempo, recria_dim_ride_flags):
+        if not create_dw_tables(conn_dw):
             print("ETL abortado devido a falha na criação/recriação das tabelas do DW.")
             return # Sai da função se as tabelas não puderem ser criadas
 
@@ -280,13 +280,11 @@ def main_etl_process(apaga_ultimo_etl_run, recria_dims_de_tempo, recria_dim_ride
         print("\n--- Iniciando ETL das Dimensões ---")
 
         # As dimensões temporais geralmente só precisam ser carregadas uma vez ou quando estender o período
-        if recria_dims_de_tempo:
-            etl_dim_date()
-            etl_dim_hour()
+        etl_dim_date()
+        etl_dim_hour()
         
         # A dim_ride_flags só precisa ser carregada uma vez
-        if recria_dim_ride_flags:
-            etl_dim_ride_flags()
+        etl_dim_ride_flags()
         
         if not etl_dim_user(): print("ETL DimUser falhou.")
         if not etl_dim_neighborhood(): print("ETL DimNeighborhood falhou.")
@@ -323,9 +321,4 @@ def main_etl_process(apaga_ultimo_etl_run, recria_dims_de_tempo, recria_dim_ride
         print("Conexões de banco de dados fechadas.")
 
 if __name__ == "__main__":
-    # Para forçar uma carga completa (apaga o last_etl_run.txt e recarrega tudo):
-    # Use isso quando quiser ter certeza que tudo está limpo e do zero.
-    main_etl_process(apaga_ultimo_etl_run=True, recria_dims_de_tempo=True, recria_dim_ride_flags=True)
-
-    # Para uma carga normal (mantém o last_etl_run.txt e faz carga incremental):
-    # main_etl_process(apaga_ultimo_etl_run=False, recria_dims_de_tempo=False, recria_dim_ride_flags=True)
+    main_etl_process(carga_completa=True)

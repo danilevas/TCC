@@ -28,9 +28,10 @@ def etl_dim_date():
             month = dt.month
             month_name = dt.strftime('%B')
             semester = (dt.month - 1) // 6 + 1
+            period = f"{dt.year}.{(dt.month - 1) // 7 + 1}"
             year = dt.year
 
-            data_to_load.append((date_sk, full_date, day_of_week, day_name, day_of_month, month, month_name, semester, year))
+            data_to_load.append((date_sk, full_date, day_of_week, day_name, day_of_month, month, month_name, semester, period, year))
         
         print(f"Gerados {len(data_to_load)} registros para dim_date.")
         print(f"Exemplo: {data_to_load[0]}")
@@ -41,8 +42,8 @@ def etl_dim_date():
         insert_query = """
         INSERT INTO dim_date (
             date_sk, full_date, day_of_week, day_name, day_of_month,
-            month, month_name, semester, year
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            month, month_name, semester, period, year
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (date_sk) DO NOTHING;
         """
         with conn_dw.cursor() as cur:

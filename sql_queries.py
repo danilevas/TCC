@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS dim_date (
     month INT NOT NULL,
     month_name VARCHAR(20) NOT NULL,
     semester INT NOT NULL,
+    period VARCHAR(20) NOT NULL,
     year INT NOT NULL,
 
     PRIMARY KEY (date_sk)
@@ -32,7 +33,6 @@ CREATE_DIM_USER_TABLE = """
 CREATE TABLE IF NOT EXISTS dim_user (
     user_sk SERIAL PRIMARY KEY,
     user_id INT UNIQUE NOT NULL, -- Chave de negócio original
-    user_name VARCHAR(255),
     profile VARCHAR(50),
     course VARCHAR(100),
     phone_number VARCHAR(100),
@@ -241,18 +241,5 @@ ALL_DDL_CREATE_QUERIES = [
 ]
 
 # Retorna as queries de DDL corretamente
-def get_queries(recria_dims_de_tempo, recria_dim_ride_flags):
-    # Se não quisermos recriar as tabelas temporais, não a dropamos nem a criamos
-    if not recria_dims_de_tempo:
-        ALL_DDL_DROP_QUERIES.remove(DROP_DIM_DATE_TABLE)
-        ALL_DDL_DROP_QUERIES.remove(DROP_DIM_HOUR_TABLE)
-
-        ALL_DDL_CREATE_QUERIES.remove(CREATE_DIM_DATE_TABLE)
-        ALL_DDL_CREATE_QUERIES.remove(CREATE_DIM_HOUR_TABLE)
-    
-    # Se não quisermos recriar a tabela dim_ride_flags, não a dropamos nem a criamos
-    if not recria_dim_ride_flags:
-        ALL_DDL_DROP_QUERIES.remove(DROP_DIM_RIDE_FLAGS_TABLE)
-        ALL_DDL_CREATE_QUERIES.remove(CREATE_DIM_RIDE_FLAGS_TABLE)
-    
+def get_queries():
     return ALL_DDL_DROP_QUERIES, ALL_DDL_CREATE_QUERIES
