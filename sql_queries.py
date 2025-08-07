@@ -170,6 +170,9 @@ CREATE TABLE IF NOT EXISTS fact_ride_interaction (
     ride_sk INT NOT NULL, -- ID da carona a que se refere (FK para dim_ride.ride_sk)
     user_sk INT NOT NULL, -- Usuário que fez a interação (motorista ou caronista)
     status_sk INT NOT NULL, -- Status final da interação
+    neighborhood_sk INT NOT NULL, -- é isso aí!
+    hub_sk INT NOT NULL, -- é isso aí!
+    ride_flags_sk INT NOT NULL, -- é isso aí!
 
     -- SKs para o momento de CRIAÇÃO da interação
     creation_date_sk INT NOT NULL,
@@ -193,6 +196,9 @@ CREATE TABLE IF NOT EXISTS fact_ride_interaction (
     FOREIGN KEY (ride_sk) REFERENCES dim_ride(ride_sk),
     FOREIGN KEY (user_sk) REFERENCES dim_user(user_sk),
     FOREIGN KEY (status_sk) REFERENCES dim_request_status(status_sk),
+    FOREIGN KEY (neighborhood_sk) REFERENCES dim_neighborhood(neighborhood_sk),
+    FOREIGN KEY (hub_sk) REFERENCES dim_hub(hub_sk),
+    FOREIGN KEY (ride_flags_sk) REFERENCES dim_ride_flags(ride_flags_sk),
     
     -- FKs para as dimensões de tempo
     FOREIGN KEY (creation_date_sk) REFERENCES dim_date(date_sk),
