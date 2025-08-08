@@ -192,22 +192,6 @@ def insert_all_unknown_dim_members(conn_dw):
         print("Falha ao inserir membro 'Desconhecido' para dim_request_status.")
         return False
 
-    # --- dim_ride ---
-    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_ride em sql_queries.py
-    dim_ride_unknown_values = {
-        'ride_sk': -1,
-        'ride_id': -1,
-        'routine_id': -1,
-        'repeats_until': '1900-01-01',
-        'created_at': '1900-01-01',
-        'updated_at': '1900-01-01',
-        'occurred_at': '1900-01-01',
-        'deleted_at': '1900-01-01'
-    }
-    if not insert_unknown_dim_member(conn_dw, 'dim_ride', ['ride_sk'], dim_ride_unknown_values):
-        print("Falha ao inserir membro 'Desconhecido' para dim_ride.")
-        return False
-
     # --- dim_ride_flags ---
     # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_ride_flags em sql_queries.py
     dim_ride_flags_unknown_values = {

@@ -90,19 +90,6 @@ CREATE TABLE IF NOT EXISTS dim_request_status (
 );
 """
 
-CREATE_DIM_RIDE_TABLE = """
-CREATE TABLE IF NOT EXISTS dim_ride (
-    ride_sk SERIAL PRIMARY KEY, -- Chave primária para o fato
-    ride_id INT UNIQUE NOT NULL, -- Chave de negócio original da carona
-    routine_id INT,
-    repeats_until TIMESTAMP,
-    created_at TIMESTAMP, -- Para controle do ETL, marca d'água
-    updated_at TIMESTAMP, -- Para controle do ETL, marca d'água
-    occurred_at TIMESTAMP, -- Descritivo
-    deleted_at TIMESTAMP -- Para controle do ETL, marca d'água
-);
-"""
-
 # Dimensão sucata
 CREATE_DIM_RIDE_FLAGS_TABLE = """
 CREATE TABLE IF NOT EXISTS dim_ride_flags (
@@ -124,8 +111,11 @@ CREATE TABLE IF NOT EXISTS dim_ride_flags (
 # DDLs para as tabelas de fatos
 CREATE_FACT_RIDE_TABLE = """
 CREATE TABLE IF NOT EXISTS fact_ride (
-    ride_pk SERIAL PRIMARY KEY, -- Chave primária para o fato
-    ride_sk INT UNIQUE NOT NULL,
+    ride_sk SERIAL PRIMARY KEY, -- Chave primária para o fato
+    ride_id INT UNIQUE NOT NULL,
+    routine_id INT, -- Pensar se deixa mesmo aqui
+    
+    -- SKs
     driver_user_sk INT NOT NULL,
     neighborhood_sk INT NOT NULL,
     hub_sk INT NOT NULL,
@@ -147,8 +137,12 @@ CREATE TABLE IF NOT EXISTS fact_ride (
     quit_requests_count INT DEFAULT 0,
     messages_count INT DEFAULT 0,
 
+    repeats_until TIMESTAMP, -- Rotina
+    created_at TIMESTAMP, -- Para controle do ETL, marca d'água
+    updated_at TIMESTAMP, -- Para controle do ETL, marca d'água
+    deleted_at TIMESTAMP -- Para controle do ETL, marca d'água
+
     -- FKs 
-    FOREIGN KEY (ride_sk) REFERENCES dim_ride(ride_sk),
     FOREIGN KEY (driver_user_sk) REFERENCES dim_user(user_sk),
     FOREIGN KEY (neighborhood_sk) REFERENCES dim_neighborhood(neighborhood_sk),
     FOREIGN KEY (hub_sk) REFERENCES dim_hub(hub_sk),
@@ -167,7 +161,7 @@ CREATE TABLE IF NOT EXISTS fact_ride_interaction (
     interaction_pk SERIAL PRIMARY KEY, -- Chave primária para o fato
     ride_user_id INT UNIQUE NOT NULL, -- Chave de negócio original da ride_user
 
-    ride_sk INT NOT NULL, -- ID da carona a que se refere (FK para dim_ride.ride_sk)
+    ride_sk INT NOT NULL, -- ID da carona a que se refere (FK para fact_ride.ride_sk)
     user_sk INT NOT NULL, -- Usuário que fez a interação (motorista ou caronista)
     status_sk INT NOT NULL, -- Status final da interação
     neighborhood_sk INT NOT NULL, -- é isso aí!
@@ -193,7 +187,7 @@ CREATE TABLE IF NOT EXISTS fact_ride_interaction (
     updated_at TIMESTAMP, -- Para controle do ETL, marca d'água
 
     -- FKs
-    FOREIGN KEY (ride_sk) REFERENCES dim_ride(ride_sk),
+    FOREIGN KEY (ride_sk) REFERENCES fact_ride(ride_sk),
     FOREIGN KEY (user_sk) REFERENCES dim_user(user_sk),
     FOREIGN KEY (status_sk) REFERENCES dim_request_status(status_sk),
     FOREIGN KEY (neighborhood_sk) REFERENCES dim_neighborhood(neighborhood_sk),
@@ -217,7 +211,6 @@ DROP_DIM_USER_TABLE = "DROP TABLE IF EXISTS dim_user CASCADE;"
 DROP_DIM_NEIGHBORHOOD_TABLE = "DROP TABLE IF EXISTS dim_neighborhood CASCADE;"
 DROP_DIM_HUB_TABLE = "DROP TABLE IF EXISTS dim_hub CASCADE;"
 DROP_DIM_REQUEST_STATUS_TABLE = "DROP TABLE IF EXISTS dim_request_status CASCADE;"
-DROP_DIM_RIDE_TABLE = "DROP TABLE IF EXISTS dim_ride CASCADE;"
 DROP_DIM_RIDE_FLAGS_TABLE = "DROP TABLE IF EXISTS dim_ride_flags CASCADE;"
 
 ALL_DDL_DROP_QUERIES = [
@@ -229,7 +222,6 @@ ALL_DDL_DROP_QUERIES = [
     DROP_DIM_NEIGHBORHOOD_TABLE,
     DROP_DIM_HUB_TABLE,
     DROP_DIM_REQUEST_STATUS_TABLE,
-    DROP_DIM_RIDE_TABLE,
     DROP_DIM_RIDE_FLAGS_TABLE
 ]
 
@@ -240,7 +232,6 @@ ALL_DDL_CREATE_QUERIES = [
     CREATE_DIM_NEIGHBORHOOD_TABLE,
     CREATE_DIM_HUB_TABLE,
     CREATE_DIM_REQUEST_STATUS_TABLE,
-    CREATE_DIM_RIDE_TABLE,
     CREATE_DIM_RIDE_FLAGS_TABLE,
     CREATE_FACT_RIDE_TABLE,
     CREATE_FACT_RIDE_INTERACTION_TABLE
