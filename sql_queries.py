@@ -53,33 +53,23 @@ CREATE TABLE IF NOT EXISTS dim_user (
 );
 """
 
-CREATE_DIM_NEIGHBORHOOD_TABLE = """
-CREATE TABLE IF NOT EXISTS dim_neighborhood (
-    neighborhood_sk SERIAL PRIMARY KEY,
-    neighborhood_id INT UNIQUE NOT NULL,
-    neighborhood_name VARCHAR(100) NOT NULL,
-    distance_to_fundao NUMERIC(8, 2),
-    zone_id INT NOT NULL,
-    zone_name VARCHAR(100), -- Desnormalizado de DimZone
-    zone_color VARCHAR(10) -- Desnormalizado de DimZone
-);
-"""
-
-CREATE_DIM_HUB_TABLE = """
-CREATE TABLE IF NOT EXISTS dim_hub (
-    hub_sk SERIAL PRIMARY KEY,
-    hub_id INT UNIQUE NOT NULL,
-    hub_name VARCHAR(100) NOT NULL,
+CREATE_DIM_PLACE_TABLE = """
+CREATE TABLE IF NOT EXISTS dim_place (
+    place_sk SERIAL PRIMARY KEY,
+    hub_id INT UNIQUE,
+    hub_name VARCHAR(100),
     center VARCHAR(100),
-    campus_id INT NOT NULL,
-    campus_name VARCHAR(100) NOT NULL, -- Desnormalizado de DimCampi
+    campus_id INT,
+    campus_name VARCHAR(100),
     campus_color VARCHAR(10),
-    campus_created_at TIMESTAMP,
-    campus_updated_at TIMESTAMP,
-    institution_id INT NOT NULL,
+    institution_id INT,
     institution_name VARCHAR(255),
-    institution_created_at TIMESTAMP,
-    institution_updated_at TIMESTAMP
+
+    neighborhood_id INT UNIQUE,
+    neighborhood_name VARCHAR(100),
+    zone_id INT,
+    zone_name VARCHAR(100),
+    zone_color VARCHAR(10)
 );
 """
 
@@ -118,8 +108,8 @@ CREATE TABLE IF NOT EXISTS fact_ride (
     
     -- SKs
     driver_user_sk INT NOT NULL,
-    neighborhood_sk INT NOT NULL,
-    hub_sk INT NOT NULL,
+    place_neighborhood_sk INT NOT NULL,
+    place_hub_sk INT NOT NULL,
     ride_flags_sk INT NOT NULL,
 
     -- SKs para o momento de CRIAÇÃO da carona
@@ -142,8 +132,8 @@ CREATE TABLE IF NOT EXISTS fact_ride (
 
     -- FKs 
     FOREIGN KEY (driver_user_sk) REFERENCES dim_user(user_sk),
-    FOREIGN KEY (neighborhood_sk) REFERENCES dim_neighborhood(neighborhood_sk),
-    FOREIGN KEY (hub_sk) REFERENCES dim_hub(hub_sk),
+    FOREIGN KEY (place_neighborhood_sk) REFERENCES dim_place(place_sk),
+    FOREIGN KEY (place_hub_sk) REFERENCES dim_place(place_sk),
     FOREIGN KEY (ride_flags_sk) REFERENCES dim_ride_flags(ride_flags_sk),
 
     -- FKs para as dimensões de tempo
@@ -195,8 +185,7 @@ DROP_FACT_RIDE_REQUEST_TABLE = "DROP TABLE IF EXISTS fact_ride_request CASCADE;"
 DROP_DIM_DATE_TABLE = "DROP TABLE IF EXISTS dim_date CASCADE;"
 DROP_DIM_HOUR_TABLE = "DROP TABLE IF EXISTS dim_hour CASCADE;"
 DROP_DIM_USER_TABLE = "DROP TABLE IF EXISTS dim_user CASCADE;"
-DROP_DIM_NEIGHBORHOOD_TABLE = "DROP TABLE IF EXISTS dim_neighborhood CASCADE;"
-DROP_DIM_HUB_TABLE = "DROP TABLE IF EXISTS dim_hub CASCADE;"
+DROP_DIM_PLACE_TABLE = "DROP TABLE IF EXISTS dim_place CASCADE;"
 DROP_DIM_REQUEST_STATUS_TABLE = "DROP TABLE IF EXISTS dim_request_status CASCADE;"
 DROP_DIM_RIDE_FLAGS_TABLE = "DROP TABLE IF EXISTS dim_ride_flags CASCADE;"
 
@@ -206,8 +195,7 @@ ALL_DDL_DROP_QUERIES = [
     DROP_DIM_DATE_TABLE,
     DROP_DIM_HOUR_TABLE,
     DROP_DIM_USER_TABLE,
-    DROP_DIM_NEIGHBORHOOD_TABLE,
-    DROP_DIM_HUB_TABLE,
+    DROP_DIM_PLACE_TABLE,
     DROP_DIM_REQUEST_STATUS_TABLE,
     DROP_DIM_RIDE_FLAGS_TABLE
 ]
@@ -216,8 +204,7 @@ ALL_DDL_CREATE_QUERIES = [
     CREATE_DIM_DATE_TABLE,
     CREATE_DIM_HOUR_TABLE,
     CREATE_DIM_USER_TABLE,
-    CREATE_DIM_NEIGHBORHOOD_TABLE,
-    CREATE_DIM_HUB_TABLE,
+    CREATE_DIM_PLACE_TABLE,
     CREATE_DIM_REQUEST_STATUS_TABLE,
     CREATE_DIM_RIDE_FLAGS_TABLE,
     CREATE_FACT_RIDE_TABLE,

@@ -318,3 +318,11 @@ AND rides.id NOT IN (
 -- AND ride_user.status = 'quit'
 -- AND ride_user.updated_at > rides.date
 ORDER BY rides.created_at, ride_user.created_at
+
+-- Cria hubs genéricos
+INSERT INTO hubs (name, center, campus_id)
+VALUES
+('CCMN','CCMN', 1),
+('CT','CT', 1),
+('CCS','CCS', 1),
+('Praia Vermelha','Praia Vermelha', 2);

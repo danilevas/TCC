@@ -12,8 +12,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from dim_scripts.dim_date_etl import etl_dim_date
 from dim_scripts.dim_hour_etl import etl_dim_hour
 from dim_scripts.dim_user_etl import etl_dim_user
-from dim_scripts.dim_neighborhood_etl import etl_dim_neighborhood
-from dim_scripts.dim_hub_etl import etl_dim_hub
+from dim_scripts.dim_place_etl import etl_dim_place
 from dim_scripts.dim_request_status_etl import etl_dim_request_status
 from dim_scripts.dim_ride_flags_etl import etl_dim_ride_flags
 
@@ -152,25 +151,10 @@ def insert_all_unknown_dim_members(conn_dw):
         print("Falha ao inserir membro 'Desconhecido' para dim_user.")
         return False
 
-    # --- dim_neighborhood ---
-    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_neighborhood em sql_queries.py
-    dim_neighborhood_unknown_values = {
-        'neighborhood_sk': -1,
-        'neighborhood_id': -1,
-        'neighborhood_name': 'Desconhecido',
-        'distance_to_fundao': 0.0, # Ou outro valor numérico padrão
-        'zone_id': -1,
-        'zone_name': 'Desconhecido',
-        'zone_color': '#000000'
-    }
-    if not insert_unknown_dim_member(conn_dw, 'dim_neighborhood', ['neighborhood_sk'], dim_neighborhood_unknown_values):
-        print("Falha ao inserir membro 'Desconhecido' para dim_neighborhood.")
-        return False
-
-    # --- dim_hub ---
-    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_hub em sql_queries.py
-    dim_hub_unknown_values = {
-        'hub_sk': -1,
+    # --- dim_place ---
+    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_place em sql_queries.py
+    dim_place_unknown_values = {
+        'place_sk': -1,
         'hub_id': -1,
         'hub_name': 'Desconhecido',
         'center': 'Desconhecido',
@@ -178,10 +162,16 @@ def insert_all_unknown_dim_members(conn_dw):
         'campus_name': 'Desconhecido',
         'campus_color': '#000000',
         'institution_id': -1,
-        'institution_name': 'Desconhecido'
+        'institution_name': 'Desconhecido',
+
+        'neighborhood_id': -1,
+        'neighborhood_name': 'Desconhecido',
+        'zone_id': -1,
+        'zone_name' : 'Desconhecido',
+        'zone_color': '#000000'
     }
-    if not insert_unknown_dim_member(conn_dw, 'dim_hub', ['hub_sk'], dim_hub_unknown_values):
-        print("Falha ao inserir membro 'Desconhecido' para dim_hub.")
+    if not insert_unknown_dim_member(conn_dw, 'dim_place', ['place_sk'], dim_place_unknown_values):
+        print("Falha ao inserir membro 'Desconhecido' para dim_place.")
         return False
 
     # --- dim_request_status ---
@@ -274,8 +264,7 @@ def main_etl_process(carga_completa):
         etl_dim_ride_flags()
         
         if not etl_dim_user(): print("ETL DimUser falhou.")
-        if not etl_dim_neighborhood(): print("ETL DimNeighborhood falhou.")
-        if not etl_dim_hub(): print("ETL DimHub falhou.")
+        if not etl_dim_place(): print("ETL DimPlace falhou.")
         if not etl_dim_request_status(): print("ETL DimRequestStatus falhou.")
         print("\n---------- ETL das Dimensões Concluído ----------")
 
