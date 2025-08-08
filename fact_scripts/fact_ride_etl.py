@@ -28,7 +28,9 @@ def etl_fact_ride(last_etl_run_date_str=None):
         
         # Obter o último timestamp do DW para carga incremental
         last_etl_run_date = get_last_etl_run_date_se_houver(conn_dw, last_etl_run_date_str, 'fact_ride')
-        print(f"Extraindo dados de caronas (rides) e ride_user. A partir de: {last_etl_run_date}")
+
+        print(f"\n\n--- FACT_RIDE --- \n\n")
+        print(f"Extraindo dados de caronas (rides) e ride_user a partir de: {last_etl_run_date}")
 
         # 1. Extração (Extract) dos dados incrementais do OLTP
         # LEFT JOIN com ride_user para garantir que pegamos o driver_id associado à carona (e driver_id=null para as deletadas)
@@ -43,11 +45,11 @@ def etl_fact_ride(last_etl_run_date_str=None):
             r.going AS is_going_to_campus,
             r.week_days,
             r.done,
+            r.deleted_at,
             r.repeats_until,
             r.created_at, -- Chaves Temporais / Controle do ETL, marca d'água
             r.updated_at, -- Para controle do ETL, marca d'água
             r.date AS occurred_at, -- Chaves Temporais
-            r.deleted_at, -- Para controle do ETL, marca d'água
             r.slots,
 	        msg.messages_count
         FROM rides r 
@@ -201,10 +203,11 @@ def etl_fact_ride(last_etl_run_date_str=None):
 
         # Limpar colunas temporárias e selecionar as finais
         final_fact_columns = [
+            'ride_id', 'routine_id',
             'driver_user_sk', 'neighborhood_sk', 'hub_sk', 'ride_flags_sk',
             'creation_date_sk', 'creation_hour_sk', 'occurrence_date_sk', 'occurrence_hour_sk',
-            'slots', 'requests_count', 'accepted_requests_count', 'refused_requests_count',
-            'pending_requests_count', 'quit_requests_count', 'messages_count'
+            'slots', 'messages_count', 'requests_count', 'accepted_requests_count', 'refused_requests_count',
+            'pending_requests_count', 'quit_requests_count', 'repeats_until'
         ]
         
         # Garantir que as colunas SK não são nulas se as FKs não são opcionais (refletir se deixamos assim, mas acho que sim porque já tem o -1 pros desconhecidos)
@@ -219,16 +222,21 @@ def etl_fact_ride(last_etl_run_date_str=None):
         
         insert_or_update_query = """
         INSERT INTO fact_ride (
+            ride_id, routine_id,
             driver_user_sk, neighborhood_sk, hub_sk, ride_flags_sk,
             creation_date_sk, creation_hour_sk, occurrence_date_sk, occurrence_hour_sk,
-            slots, requests_count, accepted_requests_count, refused_requests_count,
-            pending_requests_count, quit_requests_count, messages_count
+            slots, messages_count, requests_count, accepted_requests_count, refused_requests_count,
+            pending_requests_count, quit_requests_count, repeats_until
         ) VALUES (
+            %(ride_id)s, %(routine_id)s,
             %(driver_user_sk)s, %(neighborhood_sk)s, %(hub_sk)s, %(ride_flags_sk)s,
             %(creation_date_sk)s, %(creation_hour_sk)s, %(occurrence_date_sk)s, %(occurrence_hour_sk)s,
-            %(slots)s, %(requests_count)s, %(accepted_requests_count)s, %(refused_requests_count)s,
-            %(pending_requests_count)s, %(quit_requests_count)s, %(messages_count)s
+            %(slots)s, %(messages_count)s, %(requests_count)s, %(accepted_requests_count)s, %(refused_requests_count)s,
+            %(pending_requests_count)s, %(quit_requests_count)s, %(repeats_until)s
         ) ON CONFLICT (ride_id) DO UPDATE SET
+            ride_id = EXCLUDED.ride_id,
+            routine_id = EXCLUDED.routine_id,
+
             driver_user_sk = EXCLUDED.driver_user_sk,
             neighborhood_sk = EXCLUDED.neighborhood_sk,
             hub_sk = EXCLUDED.hub_sk,
@@ -240,12 +248,13 @@ def etl_fact_ride(last_etl_run_date_str=None):
             occurrence_hour_sk = EXCLUDED.occurrence_hour_sk,
 
             slots = EXCLUDED.slots,
+            messages_count = EXCLUDED.messages_count,
             requests_count = EXCLUDED.requests_count,
             accepted_requests_count = EXCLUDED.accepted_requests_count,
             refused_requests_count = EXCLUDED.refused_requests_count,
             pending_requests_count = EXCLUDED.pending_requests_count,
             quit_requests_count = EXCLUDED.quit_requests_count,
-            messages_count = EXCLUDED.messages_count
+            repeats_until = EXCLUDED.repeats_until
         """
         data_to_load_dicts = fact_data_to_load.to_dict(orient='records')
 

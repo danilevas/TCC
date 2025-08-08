@@ -18,11 +18,11 @@ DAY_NUM_TO_FLAG_COL = {
 }
 
 # Ordem das flags para lookup na dim_ride_flags (DEVE SER A MESMA DA CRIAÇÃO DA DIMENSÃO SUCATA)
-# AJUSTADO: 'has_description' foi substituído por 'done'
 FLAG_NAMES_ORDER = [
     'is_routine_ride',
     'is_going_to_campus',
     'done',
+    'deleted',
     'is_routine_monday',
     'is_routine_tuesday',
     'is_routine_wednesday',
@@ -65,7 +65,7 @@ def derive_and_lookup_flags(row_oltp):
     # 1. Inicializar todas as flags como FALSE (estado padrão/desconhecido)
     flags = {name: False for name in FLAG_NAMES_ORDER}
 
-    # 2. Derivar is_routine_ride, is_going_to_campus e done diretamente do OLTP
+    # 2. Derivar is_routine_ride, is_going_to_campus, done e deleted diretamente do OLTP
     # Usar .get para segurança e pd.notna para tratar NaN/None de forma robusta
     if pd.notna(row_oltp.get('is_routine_ride')) and row_oltp['is_routine_ride'] is True:
         flags['is_routine_ride'] = True
@@ -73,9 +73,12 @@ def derive_and_lookup_flags(row_oltp):
     if pd.notna(row_oltp.get('is_going_to_campus')) and row_oltp['is_going_to_campus'] is True:
         flags['is_going_to_campus'] = True
 
-    # Assumindo que 'done' é uma coluna booleana no OLTP, similar a is_routine_ride
     if pd.notna(row_oltp.get('done')) and row_oltp['done'] is True:
         flags['done'] = True
+
+    # Se houver data de exclusão da carona, deleted = True
+    if pd.notna(row_oltp.get('deleted_at')):
+        flags['deleted'] = True
     
     # 4. Derivar flags dos dias da semana (is_routine_monday, etc.)
     # Apenas se a carona for de rotina E tiver dados válidos em week_days
@@ -121,11 +124,12 @@ def etl_dim_ride_flags():
 
         data_to_load = []
 
-        # Flags independentes (is_routine_ride, is_going_to_campus, done)
+        # Flags independentes
         independent_flags_names = [
             'is_routine_ride',
             'is_going_to_campus',
-            'done' # AJUSTADO: Usando 'done'
+            'done',
+            'deleted'
         ]
 
         # Flags dos dias da semana
@@ -150,16 +154,20 @@ def etl_dim_ride_flags():
                     description_parts.append("Indo Campus")
                 else:
                     description_parts.append("Não Indo Campus")
-                if final_flags_dict['done']: # AJUSTADO: Usando 'done'
+                if final_flags_dict['done']:
                     description_parts.append("Carona Finalizada")
                 else:
                     description_parts.append("Carona Não Finalizada")
+                if final_flags_dict['deleted']:
+                    description_parts.append("Carona Deletada")
+                else:
+                    description_parts.append("Carona Não Deletada")
                 flags_description = ", ".join(description_parts)
                 
                 # Adicionar ao lista para carregamento
                 data_to_load.append(
                     (final_flags_dict['is_routine_ride'], final_flags_dict['is_going_to_campus'],
-                     final_flags_dict['done'], # AJUSTADO: Usando 'done'
+                     final_flags_dict['done'], final_flags_dict['deleted'],
                      final_flags_dict['is_routine_monday'], final_flags_dict['is_routine_tuesday'],
                      final_flags_dict['is_routine_wednesday'], final_flags_dict['is_routine_thursday'],
                      final_flags_dict['is_routine_friday'], final_flags_dict['is_routine_saturday'],
@@ -194,16 +202,20 @@ def etl_dim_ride_flags():
                         description_parts.append("Indo Campus")
                     else:
                         description_parts.append("Não Indo Campus")
-                    if final_flags_dict['done']: # AJUSTADO: Usando 'done'
+                    if final_flags_dict['done']:
                         description_parts.append("Carona Finalizada")
                     else:
                         description_parts.append("Carona Não Finalizada")
+                    if final_flags_dict['deleted']:
+                        description_parts.append("Carona Deletada")
+                    else:
+                        description_parts.append("Carona Não Deletada")
                     flags_description = ", ".join(description_parts)
 
                     # Adicionar ao lista para carregamento
                     data_to_load.append(
                         (final_flags_dict['is_routine_ride'], final_flags_dict['is_going_to_campus'],
-                         final_flags_dict['done'], # AJUSTADO: Usando 'done'
+                         final_flags_dict['done'], final_flags_dict['deleted'],
                          final_flags_dict['is_routine_monday'], final_flags_dict['is_routine_tuesday'],
                          final_flags_dict['is_routine_wednesday'], final_flags_dict['is_routine_thursday'],
                          final_flags_dict['is_routine_friday'], final_flags_dict['is_routine_saturday'],
@@ -215,11 +227,11 @@ def etl_dim_ride_flags():
         # A ordem dos %s deve corresponder à ordem das colunas no INSERT
         insert_query = """
         INSERT INTO dim_ride_flags (
-            is_routine_ride, is_going_to_campus, done,
+            is_routine_ride, is_going_to_campus, done, deleted,
             is_routine_monday, is_routine_tuesday, is_routine_wednesday,
             is_routine_thursday, is_routine_friday, is_routine_saturday, is_routine_sunday,
             flags_description
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
         """
         with conn_dw.cursor() as cur:
             execute_batch(cur, insert_query, data_to_load)

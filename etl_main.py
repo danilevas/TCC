@@ -12,11 +12,10 @@ from dim_scripts.dim_user_etl import etl_dim_user
 from dim_scripts.dim_neighborhood_etl import etl_dim_neighborhood
 from dim_scripts.dim_hub_etl import etl_dim_hub
 from dim_scripts.dim_request_status_etl import etl_dim_request_status
-from dim_scripts.dim_ride_etl import etl_dim_ride
 from dim_scripts.dim_ride_flags_etl import etl_dim_ride_flags
 
 from fact_scripts.fact_ride_etl import etl_fact_ride
-from fact_scripts.fact_ride_interaction_etl import etl_fact_ride_interaction
+from fact_scripts.fact_ride_request_etl import etl_fact_ride_request
 
 from utils import connect_to_db, insert_unknown_dim_member
 from sql_queries import get_queries
@@ -199,6 +198,7 @@ def insert_all_unknown_dim_members(conn_dw):
         'is_routine_ride': False,
         'is_going_to_campus': False,
         'done': False,
+        'deleted': False,
         'is_routine_monday': False,
         'is_routine_tuesday': False,
         'is_routine_wednesday': False,
@@ -274,14 +274,13 @@ def main_etl_process(carga_completa):
         if not etl_dim_neighborhood(): print("ETL DimNeighborhood falhou.")
         if not etl_dim_hub(): print("ETL DimHub falhou.")
         if not etl_dim_request_status(): print("ETL DimRequestStatus falhou.")
-        if not etl_dim_ride(): print("ETL DimRide falhou.")
         print("--- ETL das Dimensões Concluído ---")
 
         # 4. Executar ETL dos Fatos (Carga Incremental)
         print("\n--- Iniciando ETL dos Fatos (Incremental) ---")
         # Passar a data de last_run_date como string para a função
         if not etl_fact_ride(last_run_date.strftime("%Y-%m-%d %H:%M:%S.%f")): print("ETL FactRide falhou.")
-        if not etl_fact_ride_interaction(last_run_date.strftime("%Y-%m-%d %H:%M:%S.%f")): print("ETL FactRideInteraction falhou.")
+        if not etl_fact_ride_request(last_run_date.strftime("%Y-%m-%d %H:%M:%S.%f")): print("ETL FactRideRequest falhou.")
         print("--- ETL dos Fatos Concluído ---")
 
         # 5. Atualizar a marca d'água da última execução

@@ -13,9 +13,7 @@ def etl_dim_request_status():
         # Status conhecidos
         # Você pode obter estes da tabela ride_user.status em um DISTINCT
         # ou defini-los manualmente se forem fixos.
-        status_names = [
-            'driver', 'pending', 'accepted', 'refused', 'quit'
-        ]
+        status_names = ['pending', 'accepted', 'refused', 'quit']
         
         print("Carregando dados na dim_request_status...")
         

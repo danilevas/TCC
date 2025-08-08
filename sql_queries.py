@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS dim_ride_flags (
     is_routine_ride BOOLEAN NOT NULL,
     is_going_to_campus BOOLEAN NOT NULL,
     done BOOLEAN NOT NULL,
+    deleted BOOLEAN NOT NULL,
     is_routine_monday BOOLEAN NOT NULL,
     is_routine_tuesday BOOLEAN NOT NULL,
     is_routine_wednesday BOOLEAN NOT NULL,
@@ -130,17 +131,14 @@ CREATE TABLE IF NOT EXISTS fact_ride (
     occurrence_hour_sk INT NOT NULL,
 
     slots INT,
+    messages_count INT DEFAULT 0,
     requests_count INT DEFAULT 0,
     accepted_requests_count INT DEFAULT 0,
     refused_requests_count INT DEFAULT 0,
     pending_requests_count INT DEFAULT 0,
     quit_requests_count INT DEFAULT 0,
-    messages_count INT DEFAULT 0,
 
     repeats_until TIMESTAMP, -- Rotina
-    created_at TIMESTAMP, -- Para controle do ETL, marca d'água
-    updated_at TIMESTAMP, -- Para controle do ETL, marca d'água
-    deleted_at TIMESTAMP -- Para controle do ETL, marca d'água
 
     -- FKs 
     FOREIGN KEY (driver_user_sk) REFERENCES dim_user(user_sk),
@@ -156,17 +154,14 @@ CREATE TABLE IF NOT EXISTS fact_ride (
 );
 """
 
-CREATE_FACT_RIDE_INTERACTION_TABLE = """
-CREATE TABLE IF NOT EXISTS fact_ride_interaction (
-    interaction_pk SERIAL PRIMARY KEY, -- Chave primária para o fato
+CREATE_FACT_RIDE_REQUEST_TABLE = """
+CREATE TABLE IF NOT EXISTS fact_ride_request (
+    request_pk SERIAL PRIMARY KEY, -- Chave primária para o fato
     ride_user_id INT UNIQUE NOT NULL, -- Chave de negócio original da ride_user
 
     ride_sk INT NOT NULL, -- ID da carona a que se refere (FK para fact_ride.ride_sk)
     user_sk INT NOT NULL, -- Usuário que fez a interação (motorista ou caronista)
     status_sk INT NOT NULL, -- Status final da interação
-    neighborhood_sk INT NOT NULL, -- é isso aí!
-    hub_sk INT NOT NULL, -- é isso aí!
-    ride_flags_sk INT NOT NULL, -- é isso aí!
 
     -- SKs para o momento de CRIAÇÃO da interação
     creation_date_sk INT NOT NULL,
@@ -176,23 +171,15 @@ CREATE TABLE IF NOT EXISTS fact_ride_interaction (
     update_date_sk INT NOT NULL,
     update_hour_sk INT NOT NULL,
 
-    is_driver_interaction BOOLEAN NOT NULL,
-    is_passenger_request BOOLEAN NOT NULL,
     request_accepted BOOLEAN NOT NULL,
     request_refused BOOLEAN NOT NULL,
     request_pending BOOLEAN NOT NULL,
     request_quit BOOLEAN NOT NULL,
 
-    created_at TIMESTAMP, -- Para controle do ETL, marca d'água
-    updated_at TIMESTAMP, -- Para controle do ETL, marca d'água
-
     -- FKs
     FOREIGN KEY (ride_sk) REFERENCES fact_ride(ride_sk),
     FOREIGN KEY (user_sk) REFERENCES dim_user(user_sk),
     FOREIGN KEY (status_sk) REFERENCES dim_request_status(status_sk),
-    FOREIGN KEY (neighborhood_sk) REFERENCES dim_neighborhood(neighborhood_sk),
-    FOREIGN KEY (hub_sk) REFERENCES dim_hub(hub_sk),
-    FOREIGN KEY (ride_flags_sk) REFERENCES dim_ride_flags(ride_flags_sk),
     
     -- FKs para as dimensões de tempo
     FOREIGN KEY (creation_date_sk) REFERENCES dim_date(date_sk),
@@ -204,7 +191,7 @@ CREATE TABLE IF NOT EXISTS fact_ride_interaction (
 
 # DDL - DROP TABLES (em ordem para evitar problemas de dependência)
 DROP_FACT_RIDE_TABLE = "DROP TABLE IF EXISTS fact_ride CASCADE;"
-DROP_FACT_RIDE_INTERACTION_TABLE = "DROP TABLE IF EXISTS fact_ride_interaction CASCADE;"
+DROP_FACT_RIDE_REQUEST_TABLE = "DROP TABLE IF EXISTS fact_ride_request CASCADE;"
 DROP_DIM_DATE_TABLE = "DROP TABLE IF EXISTS dim_date CASCADE;"
 DROP_DIM_HOUR_TABLE = "DROP TABLE IF EXISTS dim_hour CASCADE;"
 DROP_DIM_USER_TABLE = "DROP TABLE IF EXISTS dim_user CASCADE;"
@@ -215,7 +202,7 @@ DROP_DIM_RIDE_FLAGS_TABLE = "DROP TABLE IF EXISTS dim_ride_flags CASCADE;"
 
 ALL_DDL_DROP_QUERIES = [
     DROP_FACT_RIDE_TABLE,
-    DROP_FACT_RIDE_INTERACTION_TABLE,
+    DROP_FACT_RIDE_REQUEST_TABLE,
     DROP_DIM_DATE_TABLE,
     DROP_DIM_HOUR_TABLE,
     DROP_DIM_USER_TABLE,
@@ -234,7 +221,7 @@ ALL_DDL_CREATE_QUERIES = [
     CREATE_DIM_REQUEST_STATUS_TABLE,
     CREATE_DIM_RIDE_FLAGS_TABLE,
     CREATE_FACT_RIDE_TABLE,
-    CREATE_FACT_RIDE_INTERACTION_TABLE
+    CREATE_FACT_RIDE_REQUEST_TABLE
 ]
 
 # Retorna as queries de DDL corretamente
