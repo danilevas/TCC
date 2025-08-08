@@ -35,25 +35,33 @@ def etl_fact_ride(last_etl_run_date_str=None):
         # e com messages para contar as mensagens
         query_extract_rides = f"""
         SELECT
+            r.routine_id,
             r.id AS ride_id,
-            r.neighborhood AS neighborhood_name, -- Para depois pegarmos o neighborhood_sk
-            r.going AS is_going_to_campus, -- Renomear para clareza
-            r.hub AS hub_name, -- Para depois pegarmos o hub_sk
+            ru.id AS ride_user_id,
+            ru.user_id AS user_id, -- Para pegarmos user_sk
+            r.neighborhood AS neighborhood_name, -- Para pegarmos neighborhood_sk
+            r.hub AS hub_name, -- Para pegarmos hub_sk
+            ru.status, -- Para pegarmos status_sk e entendermos o ride_flags_sk
+            r.created_at AS ride_created_at,
+            r.updated_at AS ride_updated_at,
+            r.date AS ride_occurred_at,
+            r.deleted_at AS ride_deleted_at,
+            ru.created_at AS request_created_at,
+            ru.updated_at AS request_updated_at,
+            r.repeats_until,
             r.slots,
-            r.week_days,
+	        msg.messages_count,
             r.done,
-            r.created_at,
-            r.date AS occurred_at,
-            ru_driver.user_id AS driver_id,
-	        msg.messages_count
+            r.week_days,
+            r.going AS is_going_to_campus
         FROM rides r 
-        LEFT JOIN ride_user ru_driver ON r.id = ru_driver.ride_id AND ru_driver.status = 'driver'
+        LEFT JOIN ride_user ru ON r.id = ru.ride_id
         LEFT JOIN (
             SELECT ride_id, COUNT(*) AS messages_count
             FROM messages
             GROUP BY ride_id
         ) AS msg ON r.id = msg.ride_id
-        WHERE (r.created_at >= '{last_etl_run_date}' OR r.updated_at >= '{last_etl_run_date}' OR r.deleted_at >= '{last_etl_run_date}');
+        WHERE (r.created_at >= '{last_etl_run_date}' OR r.updated_at >= '{last_etl_run_date}' OR r.deleted_at >= '{last_etl_run_date}' OR ru.created_at >= '{last_etl_run_date}' OR ru.updated_at >= '{last_etl_run_date}');
         """
         rides_data = pd.read_sql(query_extract_rides, conn_oltp)
 
