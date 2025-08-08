@@ -11,6 +11,8 @@ def etl_dim_date():
         return False
 
     try:
+        print("\n--- DIM_DATE ---")
+
         # Gerar datas para um período razoável (ex: 2016 a 2030)
         start_date = datetime(2016, 4, 1)
         end_date = datetime(2030, 12, 31)
@@ -34,8 +36,6 @@ def etl_dim_date():
             data_to_load.append((date_sk, full_date, day_of_week, day_name, day_of_month, month, month_name, semester, period, year))
         
         print(f"Gerados {len(data_to_load)} registros para dim_date.")
-        print(f"Exemplo: {data_to_load[0]}")
-        print(f"Exemplo: {data_to_load[1]}")
 
         # Inserir usando execute_batch para melhor performance
         from psycopg2.extras import execute_batch

@@ -12,6 +12,8 @@ def etl_dim_user():
         return False
 
     try:
+        print("\n--- DIM_USER ---")
+
         # 1. Extração (Extract) do OLTP
         print("Extraindo dados de users e institutions...")
         query_extract_users = """

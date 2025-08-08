@@ -12,8 +12,9 @@ def etl_dim_hub():
         return False
 
     try:
+        print("\n--- DIM_HUB ---")
         print("Extraindo dados de hubs, campi e institutions...")
-        # Inclui o nome e a cor do campus para desnormalizar
+
         query_extract_hubs = """
         SELECT
             h.id AS hub_id,

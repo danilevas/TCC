@@ -29,7 +29,7 @@ def etl_fact_ride(last_etl_run_date_str=None):
         # Obter o último timestamp do DW para carga incremental
         last_etl_run_date = get_last_etl_run_date_se_houver(conn_dw, last_etl_run_date_str, 'fact_ride')
 
-        print(f"\n\n--- FACT_RIDE --- \n\n")
+        print(f"\n--- FACT_RIDE ---")
         print(f"Extraindo dados de caronas (rides) e ride_user a partir de: {last_etl_run_date}")
 
         # 1. Extração (Extract) dos dados incrementais do OLTP
@@ -100,7 +100,7 @@ def etl_fact_ride(last_etl_run_date_str=None):
         rides_data['occurrence_hour_sk'] = pd.to_datetime(rides_data['occurred_at']).dt.strftime('%H%M').astype('Int64')
 
         # Determinar se é carona de rotina
-        rides_data['is_routine_ride'] = (rides_data['week_days'].notna())
+        rides_data['is_routine_ride'] = (rides_data['repeats_until'].notna())
 
         # Converter a coluna is_routine_ride para Python booleano (True/False)
         rides_data['is_routine_ride'] = rides_data['is_routine_ride'].fillna(False).astype(bool)

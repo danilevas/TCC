@@ -16,7 +16,7 @@ def etl_fact_ride_request(last_etl_run_date_str=None):
         # Obter o último timestamp do DW para carga incremental
         last_etl_run_date = get_last_etl_run_date_se_houver(conn_dw, last_etl_run_date_str, 'fact_ride_request')
 
-        print(f"\n\n--- FACT_RIDE_REQUEST --- \n\n")
+        print(f"\n--- FACT_RIDE_REQUEST ---")
         print(f"Extraindo dados de ride_user a partir de: {last_etl_run_date}")
 
         # 1. Extração (Extract)
@@ -59,8 +59,6 @@ def etl_fact_ride_request(last_etl_run_date_str=None):
 
         # -------------------- SKs --------------------
 
-        print(f"\n\n{len(requests_data)}\n\n")
-
         # Obter chaves substitutas das dimensões
         fact_ride_map = pd.read_sql("SELECT ride_id, ride_sk FROM fact_ride;", conn_dw)
         dim_user_map = pd.read_sql("SELECT user_id, user_sk FROM dim_user;", conn_dw)
@@ -70,9 +68,7 @@ def etl_fact_ride_request(last_etl_run_date_str=None):
         requests_data = requests_data.merge(dim_user_map, left_on='user_id', right_on='user_id', how='left')
         requests_data = requests_data.merge(dim_request_status_map, left_on='status', right_on='status_name', how='left')
         requests_data = requests_data.merge(fact_ride_map, left_on='ride_id', right_on='ride_id', how='left')
-
-        print(f"\n\n{len(requests_data)}\n\n")
-
+        
         # Convertendo para Int64 essas sks
         requests_data['ride_sk'] = pd.to_numeric(requests_data['ride_sk'], errors='coerce').astype('Int64')
         requests_data['user_sk'] = pd.to_numeric(requests_data['user_sk'], errors='coerce').astype('Int64')

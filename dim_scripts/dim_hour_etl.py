@@ -11,6 +11,8 @@ def etl_dim_hour():
         return False
 
     try:
+        print("\n--- DIM_HOUR ---")
+
         data_to_load = []
 
         # Para cada dia, gerar dados para todas as horas/minutos
@@ -33,8 +35,6 @@ def etl_dim_hour():
                 data_to_load.append((hour_sk, hour_of_day, minute_of_hour, time_bucket))
         
         print(f"Gerados {len(data_to_load)} registros para dim_hour.")
-        print(f"Exemplo: {data_to_load[0]}")
-        print(f"Exemplo: {data_to_load[1]}")
 
         # Inserir usando execute_batch para melhor performance
         from psycopg2.extras import execute_batch

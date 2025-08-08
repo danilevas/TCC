@@ -13,6 +13,7 @@ def etl_dim_neighborhood():
         return False
 
     try:
+        print("\n--- DIM_NEIGHBORHOOD ---")
         print("Extraindo dados de neighborhoods e zones...")
         # Inclui o nome da zona para desnormalizar
         query_extract_neighborhoods = """

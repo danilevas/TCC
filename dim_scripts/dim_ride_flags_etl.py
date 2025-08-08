@@ -116,7 +116,7 @@ def etl_dim_ride_flags():
         return False
 
     try:
-        print("Truncando dim_ride_flags antes da pré-população...")
+        print("\n--- DIM_RIDE_FLAGS ---")
         with conn_dw.cursor() as cur:
             cur.execute("TRUNCATE TABLE dim_ride_flags RESTART IDENTITY CASCADE;")
         conn_dw.commit()

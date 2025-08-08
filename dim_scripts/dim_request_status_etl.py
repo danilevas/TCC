@@ -15,6 +15,7 @@ def etl_dim_request_status():
         # ou defini-los manualmente se forem fixos.
         status_names = ['pending', 'accepted', 'refused', 'quit']
         
+        print("\n--- DIM_REQUEST_STATUS ---")
         print("Carregando dados na dim_request_status...")
         
         # Usar UPSERT para garantir que os status existam, mas não duplicar

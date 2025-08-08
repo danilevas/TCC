@@ -2,6 +2,9 @@
 from datetime import datetime
 import os
 import sys
+import warnings
+
+warnings.filterwarnings('ignore')
 
 # Adiciona o diretório raiz do projeto ao PATH para importações relativas
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -261,7 +264,7 @@ def main_etl_process(carga_completa):
         current_run_date = datetime.now() # Marcar a hora de início desta execução
 
         # 3. Executar ETL das Dimensões
-        print("\n--- Iniciando ETL das Dimensões ---")
+        print("\n---------- Iniciando ETL das Dimensões ----------")
 
         # As dimensões temporais geralmente só precisam ser carregadas uma vez ou quando estender o período
         etl_dim_date()
@@ -274,22 +277,22 @@ def main_etl_process(carga_completa):
         if not etl_dim_neighborhood(): print("ETL DimNeighborhood falhou.")
         if not etl_dim_hub(): print("ETL DimHub falhou.")
         if not etl_dim_request_status(): print("ETL DimRequestStatus falhou.")
-        print("--- ETL das Dimensões Concluído ---")
+        print("\n---------- ETL das Dimensões Concluído ----------")
 
         # 4. Executar ETL dos Fatos (Carga Incremental)
         print("\n--- Iniciando ETL dos Fatos (Incremental) ---")
         # Passar a data de last_run_date como string para a função
         if not etl_fact_ride(last_run_date.strftime("%Y-%m-%d %H:%M:%S.%f")): print("ETL FactRide falhou.")
         if not etl_fact_ride_request(last_run_date.strftime("%Y-%m-%d %H:%M:%S.%f")): print("ETL FactRideRequest falhou.")
-        print("--- ETL dos Fatos Concluído ---")
+        print("\n--- ETL dos Fatos Concluído ---")
 
         # 5. Atualizar a marca d'água da última execução
         set_last_etl_run_date(current_run_date)
-        print(f"\nProcesso ETL concluído com sucesso! Última execução registrada em: {current_run_date}")
+        print(f"\nProcesso ETL concluído com *SUCESSO*\nÚltima execução registrada em: {current_run_date}\n")
     
     except Exception as e:
         # Captura qualquer exceção não tratada e a imprime
-        print(f"\nOcorreu um erro crítico inesperado no processo ETL: {e}")
+        print(f"\nOcorreu um *ERRO CRÍTICO* inesperado no processo ETL: {e}")
         # Opcional: registrar stack trace para depuração mais detalhada
         # import traceback
         # traceback.print_exc()
