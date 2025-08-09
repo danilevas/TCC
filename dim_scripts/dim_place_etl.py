@@ -22,7 +22,6 @@ def etl_dim_place():
             h.center,
             h.campus_id,
             c.name AS campus_name,
-            c.color AS campus_color,
             c.institution_id,
             i.name AS institution_name
         FROM hubs h
@@ -38,8 +37,7 @@ def etl_dim_place():
             n.id AS neighborhood_id,
             n.name AS neighborhood_name,
             n.zone_id,
-            z.name AS zone_name,
-            z.color AS zone_color
+            z.name AS zone_name
         FROM neighborhoods n
         LEFT JOIN zones z ON n.zone_id = z.id;
         """
@@ -69,12 +67,12 @@ def etl_dim_place():
         insert_or_update_query = """
         INSERT INTO dim_place (
             hub_id, hub_name, center,
-            campus_id, campus_name, campus_color, institution_id, institution_name,
-            neighborhood_id, neighborhood_name, zone_id, zone_name, zone_color
+            campus_id, campus_name, institution_id, institution_name,
+            neighborhood_id, neighborhood_name, zone_id, zone_name
         ) VALUES (
             %(hub_id)s, %(hub_name)s, %(center)s,
-            %(campus_id)s, %(campus_name)s, %(campus_color)s, %(institution_id)s, %(institution_name)s,
-            %(neighborhood_id)s, %(neighborhood_name)s, %(zone_id)s, %(zone_name)s, %(zone_color)s
+            %(campus_id)s, %(campus_name)s, %(institution_id)s, %(institution_name)s,
+            %(neighborhood_id)s, %(neighborhood_name)s, %(zone_id)s, %(zone_name)s
         )
         ON CONFLICT (place_sk) DO UPDATE SET
             hub_id = EXCLUDED.hub_id,
@@ -82,15 +80,13 @@ def etl_dim_place():
             center = EXCLUDED.center,
             campus_id = EXCLUDED.campus_id,
             campus_name = EXCLUDED.campus_name,
-            campus_color = EXCLUDED.campus_color,
             institution_id = EXCLUDED.institution_id,
             institution_name = EXCLUDED.institution_name,
 
             neighborhood_id = EXCLUDED.neighborhood_id,
             neighborhood_name = EXCLUDED.neighborhood_name,
             zone_id = EXCLUDED.zone_id,
-            zone_name = EXCLUDED.zone_name,
-            zone_color = EXCLUDED.zone_color
+            zone_name = EXCLUDED.zone_name
         """
         data_to_load = place_data.to_dict(orient='records')
 

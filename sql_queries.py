@@ -41,7 +41,6 @@ CREATE TABLE IF NOT EXISTS dim_user (
     car_model VARCHAR(100),
     car_color VARCHAR(50),
     car_plate VARCHAR(20),
-    user_location VARCHAR(255),
     app_platform VARCHAR(255),
     app_version VARCHAR(255),
     is_banned BOOLEAN NOT NULL,
@@ -61,15 +60,13 @@ CREATE TABLE IF NOT EXISTS dim_place (
     center VARCHAR(100),
     campus_id INT,
     campus_name VARCHAR(100),
-    campus_color VARCHAR(10),
     institution_id INT,
     institution_name VARCHAR(255),
 
     neighborhood_id INT UNIQUE,
     neighborhood_name VARCHAR(100),
     zone_id INT,
-    zone_name VARCHAR(100),
-    zone_color VARCHAR(10)
+    zone_name VARCHAR(100)
 );
 """
 
@@ -160,11 +157,6 @@ CREATE TABLE IF NOT EXISTS fact_ride_request (
     -- SKs para o momento de ATUALIZAÇÃO da interação
     update_date_sk INT NOT NULL,
     update_hour_sk INT NOT NULL,
-
-    request_accepted BOOLEAN NOT NULL,
-    request_refused BOOLEAN NOT NULL,
-    request_pending BOOLEAN NOT NULL,
-    request_quit BOOLEAN NOT NULL,
 
     -- FKs
     FOREIGN KEY (ride_sk) REFERENCES fact_ride(ride_sk),

@@ -49,14 +49,6 @@ def etl_fact_ride_request(last_etl_run_date_str=None):
         requests_data['update_date_sk'] = pd.to_datetime(requests_data['updated_at']).dt.strftime('%Y%m%d').astype('Int64')
         requests_data['update_hour_sk'] = pd.to_datetime(requests_data['updated_at']).dt.strftime('%H%M').astype('Int64')
 
-        # -------------------- STATUS --------------------
-
-        # Criar as colunas booleanas de status
-        requests_data['request_accepted'] = (requests_data['status'] == 'accepted')
-        requests_data['request_refused'] = (requests_data['status'] == 'refused')
-        requests_data['request_pending'] = (requests_data['status'] == 'pending')
-        requests_data['request_quit'] = (requests_data['status'] == 'quit')
-
         # -------------------- SKs --------------------
 
         # Obter chaves substitutas das dimensões
@@ -82,8 +74,7 @@ def etl_fact_ride_request(last_etl_run_date_str=None):
         # Limpar colunas temporárias e selecionar as finais
         final_fact_columns = [
             'ride_user_id', 'ride_sk', 'user_sk', 'status_sk',
-            'creation_date_sk', 'creation_hour_sk', 'update_date_sk', 'update_hour_sk',
-            'request_accepted', 'request_refused', 'request_pending', 'request_quit'
+            'creation_date_sk', 'creation_hour_sk', 'update_date_sk', 'update_hour_sk'
         ]
 
         # Garantir que as colunas SK não são nulas
@@ -101,12 +92,10 @@ def etl_fact_ride_request(last_etl_run_date_str=None):
         insert_or_update_query = """
         INSERT INTO fact_ride_request (
             ride_user_id, ride_sk, user_sk, status_sk,
-            creation_date_sk, creation_hour_sk, update_date_sk, update_hour_sk,
-            request_accepted, request_refused, request_pending, request_quit
+            creation_date_sk, creation_hour_sk, update_date_sk, update_hour_sk
         ) VALUES (
             %(ride_user_id)s, %(ride_sk)s, %(user_sk)s, %(status_sk)s,
-            %(creation_date_sk)s, %(creation_hour_sk)s, %(update_date_sk)s, %(update_hour_sk)s,
-            %(request_accepted)s, %(request_refused)s, %(request_pending)s, %(request_quit)s
+            %(creation_date_sk)s, %(creation_hour_sk)s, %(update_date_sk)s, %(update_hour_sk)s
         ) ON CONFLICT (ride_user_id) DO UPDATE SET
             ride_sk = EXCLUDED.ride_sk,
             user_sk = EXCLUDED.user_sk,
@@ -116,12 +105,7 @@ def etl_fact_ride_request(last_etl_run_date_str=None):
             creation_hour_sk = EXCLUDED.creation_hour_sk,
 
             update_date_sk = EXCLUDED.update_date_sk,
-            update_hour_sk = EXCLUDED.update_hour_sk,
-
-            request_accepted = EXCLUDED.request_accepted,
-            request_refused = EXCLUDED.request_refused,
-            request_pending = EXCLUDED.request_pending,
-            request_quit = EXCLUDED.request_quit
+            update_hour_sk = EXCLUDED.update_hour_sk
         """
         data_to_load_dicts = fact_data_to_load.to_dict(orient='records')
 

@@ -105,6 +105,9 @@ def etl_fact_ride(last_etl_run_date_str=None):
         # Converter a coluna is_routine_ride para Python booleano (True/False)
         rides_data['is_routine_ride'] = rides_data['is_routine_ride'].fillna(False).astype(bool)
 
+        # Tornar nulos os valores de 'routine_id' onde 'is_routine_ride' é falso
+        rides_data.loc[~rides_data['is_routine_ride'], 'routine_id'] = pd.NA
+
         # -------------------- FLAGS --------------------
 
         print("Derivando flags e buscando ride_flags_sk...")

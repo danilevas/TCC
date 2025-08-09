@@ -139,7 +139,6 @@ def insert_all_unknown_dim_members(conn_dw):
         'car_color': '#000000',
         'car_plate': 'Desconhecido',
 
-        'user_location': 'Desconhecido',
         'app_platform': 'Desconhecido',
         'app_version': 'Desconhecido',
 
@@ -160,15 +159,13 @@ def insert_all_unknown_dim_members(conn_dw):
         'center': 'Desconhecido',
         'campus_id': -1,
         'campus_name': 'Desconhecido',
-        'campus_color': '#000000',
         'institution_id': -1,
         'institution_name': 'Desconhecido',
 
         'neighborhood_id': -1,
         'neighborhood_name': 'Desconhecido',
         'zone_id': -1,
-        'zone_name' : 'Desconhecido',
-        'zone_color': '#000000'
+        'zone_name' : 'Desconhecido'
     }
     if not insert_unknown_dim_member(conn_dw, 'dim_place', ['place_sk'], dim_place_unknown_values):
         print("Falha ao inserir membro 'Desconhecido' para dim_place.")
