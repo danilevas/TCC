@@ -102,11 +102,11 @@ CREATE TABLE IF NOT EXISTS fact_ride (
     ride_sk SERIAL PRIMARY KEY, -- Chave primária para o fato
     ride_id INT UNIQUE NOT NULL,
     routine_id INT, -- Pensar se deixa mesmo aqui
-    
+
     -- SKs
     driver_user_sk INT NOT NULL,
-    place_neighborhood_sk INT NOT NULL,
-    place_hub_sk INT NOT NULL,
+    place_origin_sk INT NOT NULL,
+    place_destination_sk INT NOT NULL,
     ride_flags_sk INT NOT NULL,
 
     -- SKs para o momento de CRIAÇÃO da carona
@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS fact_ride (
     occurrence_date_sk INT NOT NULL,
     occurrence_hour_sk INT NOT NULL,
 
-    slots INT,
+    slots_count INT,
     messages_count INT DEFAULT 0,
     requests_count INT DEFAULT 0,
     accepted_requests_count INT DEFAULT 0,
@@ -127,10 +127,10 @@ CREATE TABLE IF NOT EXISTS fact_ride (
 
     repeats_until TIMESTAMP, -- Rotina
 
-    -- FKs 
+    -- FKs
     FOREIGN KEY (driver_user_sk) REFERENCES dim_user(user_sk),
-    FOREIGN KEY (place_neighborhood_sk) REFERENCES dim_place(place_sk),
-    FOREIGN KEY (place_hub_sk) REFERENCES dim_place(place_sk),
+    FOREIGN KEY (place_origin_sk) REFERENCES dim_place(place_sk),
+    FOREIGN KEY (place_destination_sk) REFERENCES dim_place(place_sk),
     FOREIGN KEY (ride_flags_sk) REFERENCES dim_ride_flags(ride_flags_sk),
 
     -- FKs para as dimensões de tempo

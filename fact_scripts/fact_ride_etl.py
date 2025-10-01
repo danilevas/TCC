@@ -40,8 +40,8 @@ def etl_fact_ride(last_etl_run_date_str=None):
             r.id AS ride_id,
             r.routine_id,
             ru_driver.user_id AS driver_id,
-            r.neighborhood AS neighborhood_name, -- Para pegarmos o place_neighborhood_sk
-            r.hub AS hub_name, -- Para pegarmos o place_hub_sk
+            r.neighborhood AS neighborhood_name, -- Para pegarmos o sk
+            r.hub AS hub_name, -- Para pegarmos o sk
             r.going AS is_going_to_campus,
             r.week_days,
             r.done,
@@ -50,7 +50,7 @@ def etl_fact_ride(last_etl_run_date_str=None):
             r.created_at, -- Chaves Temporais / Controle do ETL, marca d'água
             r.updated_at, -- Para controle do ETL, marca d'água
             r.date AS occurred_at, -- Chaves Temporais
-            r.slots,
+            r.slots AS slots_count,
 	        msg.messages_count
         FROM rides r 
         LEFT JOIN ride_user ru_driver ON r.id = ru_driver.ride_id AND ru_driver.status = 'driver'
@@ -76,7 +76,7 @@ def etl_fact_ride(last_etl_run_date_str=None):
 
         # 1.5. Tratamento de tipos
         # Convertendo as colunas numéricas
-        colunas_numericas = ['ride_id', 'routine_id', 'slots', 'driver_id', 'messages_count']
+        colunas_numericas = ['ride_id', 'routine_id', 'slots_count', 'driver_id', 'messages_count']
         for coluna in colunas_numericas:
             rides_data[coluna] = pd.to_numeric(rides_data[coluna], errors='coerce').astype('Int64')
         
@@ -167,7 +167,7 @@ def etl_fact_ride(last_etl_run_date_str=None):
             'pending_requests_count': 0, 'accepted_requests_count': 0,
             'refused_requests_count': 0, 'quit_requests_count': 0,
             'requests_count': 0, 'messages_count': 0,
-            'is_going_to_campus': False, 'slots': 0, 'is_routine_ride': False,
+            'is_going_to_campus': False, 'slots_count': 0, 'is_routine_ride': False,
             'driver_creation_events_agg': 0
         }, inplace=True)
 
@@ -202,19 +202,43 @@ def etl_fact_ride(last_etl_run_date_str=None):
         rides_data['place_neighborhood_sk'].fillna(-1, inplace=True)
         rides_data['place_hub_sk'].fillna(-1, inplace=True)
 
+        # -------------------- PLACE --------------------
+
+        # Criar place_origin_sk e place_destination_sk baseado em is_going_to_campus
+        # Se is_going_to_campus = True: origem = bairro, destino = hub
+        # Se is_going_to_campus = False: origem = hub, destino = bairro
+        rides_data['place_origin_sk'] = rides_data.apply(
+            lambda row: row['place_neighborhood_sk'] if row['is_going_to_campus'] else row['place_hub_sk'],
+            axis=1
+        )
+        rides_data['place_destination_sk'] = rides_data.apply(
+            lambda row: row['place_hub_sk'] if row['is_going_to_campus'] else row['place_neighborhood_sk'],
+            axis=1
+        )
+
+        # Convertendo para Int64
+        rides_data['place_origin_sk'] = pd.to_numeric(rides_data['place_origin_sk'], errors='coerce').astype('Int64')
+        rides_data['place_destination_sk'] = pd.to_numeric(rides_data['place_destination_sk'], errors='coerce').astype('Int64')
+
+        # Tratamento de SKs nulas
+        rides_data['place_origin_sk'].fillna(-1, inplace=True)
+        rides_data['place_destination_sk'].fillna(-1, inplace=True)
+
+
+
         # -------------------- FINAL --------------------
 
         # Limpar colunas temporárias e selecionar as finais
         final_fact_columns = [
             'ride_id', 'routine_id',
-            'driver_user_sk', 'place_neighborhood_sk', 'place_hub_sk', 'ride_flags_sk',
+            'driver_user_sk', 'place_origin_sk', 'place_destination_sk', 'ride_flags_sk',
             'creation_date_sk', 'creation_hour_sk', 'occurrence_date_sk', 'occurrence_hour_sk',
-            'slots', 'messages_count', 'requests_count', 'accepted_requests_count', 'refused_requests_count',
+            'slots_count', 'messages_count', 'requests_count', 'accepted_requests_count', 'refused_requests_count',
             'pending_requests_count', 'quit_requests_count', 'repeats_until'
         ]
-        
+
         # Garantir que as colunas SK não são nulas se as FKs não são opcionais (refletir se deixamos assim, mas acho que sim porque já tem o -1 pros desconhecidos)
-        rides_data.dropna(subset=['driver_user_sk', 'place_neighborhood_sk', 'place_hub_sk', 'ride_flags_sk',
+        rides_data.dropna(subset=['driver_user_sk', 'place_origin_sk', 'place_destination_sk', 'ride_flags_sk',
                                   'creation_date_sk', 'creation_hour_sk', 'occurrence_date_sk', 'occurrence_hour_sk'], inplace=True)
         
         fact_data_to_load = rides_data[final_fact_columns]
@@ -226,23 +250,23 @@ def etl_fact_ride(last_etl_run_date_str=None):
         insert_or_update_query = """
         INSERT INTO fact_ride (
             ride_id, routine_id,
-            driver_user_sk, place_neighborhood_sk, place_hub_sk, ride_flags_sk,
+            driver_user_sk, place_origin_sk, place_destination_sk, ride_flags_sk,
             creation_date_sk, creation_hour_sk, occurrence_date_sk, occurrence_hour_sk,
-            slots, messages_count, requests_count, accepted_requests_count, refused_requests_count,
+            slots_count, messages_count, requests_count, accepted_requests_count, refused_requests_count,
             pending_requests_count, quit_requests_count, repeats_until
         ) VALUES (
             %(ride_id)s, %(routine_id)s,
-            %(driver_user_sk)s, %(place_neighborhood_sk)s, %(place_hub_sk)s, %(ride_flags_sk)s,
+            %(driver_user_sk)s, %(place_origin_sk)s, %(place_destination_sk)s, %(ride_flags_sk)s,
             %(creation_date_sk)s, %(creation_hour_sk)s, %(occurrence_date_sk)s, %(occurrence_hour_sk)s,
-            %(slots)s, %(messages_count)s, %(requests_count)s, %(accepted_requests_count)s, %(refused_requests_count)s,
+            %(slots_count)s, %(messages_count)s, %(requests_count)s, %(accepted_requests_count)s, %(refused_requests_count)s,
             %(pending_requests_count)s, %(quit_requests_count)s, %(repeats_until)s
         ) ON CONFLICT (ride_id) DO UPDATE SET
             ride_id = EXCLUDED.ride_id,
             routine_id = EXCLUDED.routine_id,
 
             driver_user_sk = EXCLUDED.driver_user_sk,
-            place_neighborhood_sk = EXCLUDED.place_neighborhood_sk,
-            place_hub_sk = EXCLUDED.place_hub_sk,
+            place_origin_sk = EXCLUDED.place_origin_sk,
+            place_destination_sk = EXCLUDED.place_destination_sk,
             ride_flags_sk = EXCLUDED.ride_flags_sk,
 
             creation_date_sk = EXCLUDED.creation_date_sk,
@@ -250,7 +274,7 @@ def etl_fact_ride(last_etl_run_date_str=None):
             occurrence_date_sk = EXCLUDED.occurrence_date_sk,
             occurrence_hour_sk = EXCLUDED.occurrence_hour_sk,
 
-            slots = EXCLUDED.slots,
+            slots_count = EXCLUDED.slots_count,
             messages_count = EXCLUDED.messages_count,
             requests_count = EXCLUDED.requests_count,
             accepted_requests_count = EXCLUDED.accepted_requests_count,
