@@ -176,8 +176,8 @@ def etl_fact_ride(last_etl_run_date_str=None):
         # Obter chaves substitutas das dimensões já carregadas
         # Otimização: Carregar mapas de SKs uma vez
         dim_user_map = pd.read_sql("SELECT user_id, user_sk FROM dim_user;", conn_dw)
-        dim_place_neighborhood_map = pd.read_sql("SELECT neighborhood_name, place_sk AS place_neighborhood_sk FROM dim_place;", conn_dw)
-        dim_place_hub_map = pd.read_sql("SELECT hub_name, place_sk AS place_hub_sk FROM dim_place;", conn_dw)
+        dim_place_neighborhood_map = pd.read_sql("SELECT place_name, place_sk AS place_neighborhood_sk FROM dim_place;", conn_dw)
+        dim_place_hub_map = pd.read_sql("SELECT place_name, place_sk AS place_hub_sk FROM dim_place;", conn_dw)
 
         # Convertendo para numéricos os mapas das dimensões
         dim_user_map['user_id'] = pd.to_numeric(dim_user_map['user_id'], errors='coerce').astype('Int64')
@@ -187,10 +187,10 @@ def etl_fact_ride(last_etl_run_date_str=None):
         rides_data.rename(columns={'user_sk': 'driver_user_sk'}, inplace=True)
 
         # Fazendo o merge com dim_place_neighborhood_map
-        rides_data = rides_data.merge(dim_place_neighborhood_map, left_on='neighborhood_name', right_on='neighborhood_name', how='left')
+        rides_data = rides_data.merge(dim_place_neighborhood_map, left_on='neighborhood_name', right_on='place_name', how='left')
 
         # Fazendo o merge com dim_place_hub_map
-        rides_data = rides_data.merge(dim_place_hub_map, left_on='hub_name', right_on='hub_name', how='left')
+        rides_data = rides_data.merge(dim_place_hub_map, left_on='hub_name', right_on='place_name', how='left')
 
         # Convertendo para Int64 essas sks
         rides_data['driver_user_sk'] = pd.to_numeric(rides_data['driver_user_sk'], errors='coerce').astype('Int64')

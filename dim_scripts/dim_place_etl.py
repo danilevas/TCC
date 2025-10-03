@@ -18,7 +18,7 @@ def etl_dim_place():
         query_extract_hubs = """
         SELECT
             h.id AS hub_id,
-            h.name AS hub_name,
+            h.name AS place_name,
             h.center,
             h.campus_id,
             c.name AS campus_name,
@@ -35,7 +35,7 @@ def etl_dim_place():
         query_extract_neighborhoods = """
         SELECT
             n.id AS neighborhood_id,
-            n.name AS neighborhood_name,
+            n.name AS place_name,
             n.zone_id,
             z.name AS zone_name
         FROM neighborhoods n
@@ -44,9 +44,9 @@ def etl_dim_place():
         neighborhoods_data = pd.read_sql(query_extract_neighborhoods, conn_oltp)
         print(f"Extraídos {len(neighborhoods_data)} bairros.")
 
-        # Criando a coluna 'tipo' em cada DataFrame antes de concatenar
-        hubs_data['tipo'] = 'hub'
-        neighborhoods_data['tipo'] = 'neighborhood'
+        # Criando a coluna 'place_type' em cada DataFrame antes de concatenar
+        hubs_data['place_type'] = 'hub'
+        neighborhoods_data['place_type'] = 'neighborhood'
 
         # Concatenando os DataFrames
         place_data = pd.concat([hubs_data, neighborhoods_data], ignore_index=True)
@@ -56,8 +56,8 @@ def etl_dim_place():
         for coluna in colunas_numericas:
             place_data[coluna] = pd.to_numeric(place_data[coluna], errors='coerce').astype('Int64')
 
-        # Jogando a coluna tipo pro início do df_final
-        cols = ['tipo'] + [col for col in place_data.columns if col != 'tipo']
+        # Jogando a coluna place_type pro início do df_final
+        cols = ['place_type'] + [col for col in place_data.columns if col != 'place_type']
         place_data = place_data[cols]
 
         place_data = place_data.replace({pd.NA: None, '': None})
@@ -66,17 +66,19 @@ def etl_dim_place():
         from psycopg2.extras import execute_batch
         insert_or_update_query = """
         INSERT INTO dim_place (
-            hub_id, hub_name, center,
-            campus_id, campus_name, institution_id, institution_name,
-            neighborhood_id, neighborhood_name, zone_id, zone_name
+            place_name, place_type,
+            hub_id, center, campus_id, campus_name, institution_id, institution_name,
+            neighborhood_id, zone_id, zone_name
         ) VALUES (
-            %(hub_id)s, %(hub_name)s, %(center)s,
-            %(campus_id)s, %(campus_name)s, %(institution_id)s, %(institution_name)s,
-            %(neighborhood_id)s, %(neighborhood_name)s, %(zone_id)s, %(zone_name)s
+            %(place_name)s, %(place_type)s,
+            %(hub_id)s, %(center)s, %(campus_id)s, %(campus_name)s, %(institution_id)s, %(institution_name)s,
+            %(neighborhood_id)s, %(zone_id)s, %(zone_name)s
         )
         ON CONFLICT (place_sk) DO UPDATE SET
+            place_name = EXCLUDED.place_name,
+            place_type = EXCLUDED.place_type,
+
             hub_id = EXCLUDED.hub_id,
-            hub_name = EXCLUDED.hub_name,
             center = EXCLUDED.center,
             campus_id = EXCLUDED.campus_id,
             campus_name = EXCLUDED.campus_name,
@@ -84,7 +86,6 @@ def etl_dim_place():
             institution_name = EXCLUDED.institution_name,
 
             neighborhood_id = EXCLUDED.neighborhood_id,
-            neighborhood_name = EXCLUDED.neighborhood_name,
             zone_id = EXCLUDED.zone_id,
             zone_name = EXCLUDED.zone_name
         """

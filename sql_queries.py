@@ -55,8 +55,9 @@ CREATE TABLE IF NOT EXISTS dim_user (
 CREATE_DIM_PLACE_TABLE = """
 CREATE TABLE IF NOT EXISTS dim_place (
     place_sk SERIAL PRIMARY KEY,
+    place_name VARCHAR(255),
+
     hub_id INT UNIQUE,
-    hub_name VARCHAR(100),
     center VARCHAR(100),
     campus_id INT,
     campus_name VARCHAR(100),
@@ -64,7 +65,6 @@ CREATE TABLE IF NOT EXISTS dim_place (
     institution_name VARCHAR(255),
 
     neighborhood_id INT UNIQUE,
-    neighborhood_name VARCHAR(100),
     zone_id INT,
     zone_name VARCHAR(100)
 );

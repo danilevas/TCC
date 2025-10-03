@@ -154,8 +154,9 @@ def insert_all_unknown_dim_members(conn_dw):
     # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_place em sql_queries.py
     dim_place_unknown_values = {
         'place_sk': -1,
+        'place_name': 'Desconhecido',
+
         'hub_id': -1,
-        'hub_name': 'Desconhecido',
         'center': 'Desconhecido',
         'campus_id': -1,
         'campus_name': 'Desconhecido',
@@ -163,7 +164,6 @@ def insert_all_unknown_dim_members(conn_dw):
         'institution_name': 'Desconhecido',
 
         'neighborhood_id': -1,
-        'neighborhood_name': 'Desconhecido',
         'zone_id': -1,
         'zone_name' : 'Desconhecido'
     }
