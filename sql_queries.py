@@ -33,14 +33,12 @@ CREATE_DIM_USER_TABLE = """
 CREATE TABLE IF NOT EXISTS dim_user (
     user_sk SERIAL PRIMARY KEY,
     user_id INT UNIQUE NOT NULL, -- Chave de negócio original
-    profile VARCHAR(50),
+    academic_affiliation VARCHAR(50),
     course VARCHAR(100),
     phone_number VARCHAR(100),
     email VARCHAR(255),
     has_car BOOLEAN NOT NULL,
     car_model VARCHAR(100),
-    car_color VARCHAR(50),
-    car_plate VARCHAR(20),
     app_platform VARCHAR(255),
     app_version VARCHAR(255),
     is_banned BOOLEAN NOT NULL,

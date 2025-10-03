@@ -19,14 +19,12 @@ def etl_dim_user():
         query_extract_users = """
         SELECT
             u.id AS user_id,
-            u.profile,
+            u.profile AS academic_affiliation,
             u.course,
             u.phone_number,
             u.email,
             u.car_owner AS has_car,
             u.car_model,
-            u.car_color,
-            u.car_plate,
             u.app_platform,
             u.app_version,
             u.banned AS is_banned,
@@ -45,8 +43,6 @@ def etl_dim_user():
 
         # Tratar valores nulos ou inconsistências (ex: car_model se has_car é falso)
         users_data['car_model'] = users_data.apply(lambda row: row['car_model'] if row['has_car'] else None, axis=1)
-        users_data['car_color'] = users_data.apply(lambda row: row['car_color'] if row['has_car'] else None, axis=1)
-        users_data['car_plate'] = users_data.apply(lambda row: row['car_plate'] if row['has_car'] else None, axis=1)
         
         # Garantir que strings vazias ou NaN sejam None para NULL no banco
         users_data = users_data.replace({pd.NA: None, '': None})
@@ -59,28 +55,24 @@ def etl_dim_user():
         from psycopg2.extras import execute_batch
         insert_or_update_query = """
         INSERT INTO dim_user (
-            user_id, profile, course, 
+            user_id, academic_affiliation, course, 
             phone_number, email, has_car,
-            car_model, car_color, car_plate,
-            app_platform, app_version,
+            car_model, app_platform, app_version,
             is_banned, institution_id, institution_name,
             created_at, updated_at, deleted_at
         ) VALUES (
-            %(user_id)s, %(profile)s, %(course)s,
+            %(user_id)s, %(academic_affiliation)s, %(course)s,
             %(phone_number)s, %(email)s, %(has_car)s,
-            %(car_model)s, %(car_color)s, %(car_plate)s,
-            %(app_platform)s, %(app_version)s,
+            %(car_model)s, %(app_platform)s, %(app_version)s,
             %(is_banned)s, %(institution_id)s, %(institution_name)s,
             %(created_at)s, %(updated_at)s, %(deleted_at)s
         ) ON CONFLICT (user_id) DO UPDATE SET
-            profile = EXCLUDED.profile,
+            academic_affiliation = EXCLUDED.academic_affiliation,
             course = EXCLUDED.course,
             phone_number = EXCLUDED.phone_number,
             email = EXCLUDED.email,
             has_car = EXCLUDED.has_car,
             car_model = EXCLUDED.car_model,
-            car_color = EXCLUDED.car_color,
-            car_plate = EXCLUDED.car_plate,
             app_platform = EXCLUDED.app_platform,
             app_version = EXCLUDED.app_version,
             is_banned = EXCLUDED.is_banned,

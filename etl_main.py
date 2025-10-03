@@ -130,14 +130,12 @@ def insert_all_unknown_dim_members(conn_dw):
     dim_user_unknown_values = {
         'user_sk': -1,
         'user_id': -1,
-        'profile': 'Desconhecido',
+        'academic_affiliation': 'Desconhecido',
         'course': 'Desconhecido',
         'phone_number': 'Desconhecido',
         'email': 'Desconhecido',
         'has_car': False,
         'car_model': 'Desconhecido',
-        'car_color': '#000000',
-        'car_plate': 'Desconhecido',
 
         'app_platform': 'Desconhecido',
         'app_version': 'Desconhecido',
