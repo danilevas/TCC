@@ -56,6 +56,7 @@ CREATE_DIM_PLACE_TABLE = """
 CREATE TABLE IF NOT EXISTS dim_place (
     place_sk SERIAL PRIMARY KEY,
     place_name VARCHAR(255),
+    place_type VARCHAR(50),
 
     hub_id INT UNIQUE,
     center VARCHAR(100),

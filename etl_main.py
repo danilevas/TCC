@@ -155,6 +155,7 @@ def insert_all_unknown_dim_members(conn_dw):
     dim_place_unknown_values = {
         'place_sk': -1,
         'place_name': 'Desconhecido',
+        'place_type': 'Desconhecido',
 
         'hub_id': -1,
         'center': 'Desconhecido',
