@@ -3,7 +3,6 @@ import pandas as pd
 from config import DB_OLTP, DB_DW
 from utils import connect_to_db, get_last_etl_run_date_se_houver
 from psycopg2.extras import execute_batch
-import numpy as np # Importar numpy para pd.NA
 
 from dim_scripts.dim_ride_flags_etl import load_ride_flags_lookup, derive_and_lookup_flags
 
