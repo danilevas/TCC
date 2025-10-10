@@ -38,27 +38,27 @@ def etl_fact_ride(last_etl_run_date_str=None):
         SELECT
             r.id AS ride_id,
             r.routine_id,
+            r.repeats_until,
             ru_driver.user_id AS driver_id,
             r.neighborhood AS neighborhood_name, -- Para pegarmos o sk
             r.hub AS hub_name, -- Para pegarmos o sk
             r.going AS is_going_to_campus,
-            r.week_days,
             r.done,
             r.deleted_at,
-            r.repeats_until,
             r.created_at, -- Chaves Temporais / Controle do ETL, marca d'água
             r.updated_at, -- Para controle do ETL, marca d'água
             r.date AS occurred_at, -- Chaves Temporais
             r.slots AS slots_count,
 	        msg.messages_count
-        FROM rides r 
+        FROM rides r
         LEFT JOIN ride_user ru_driver ON r.id = ru_driver.ride_id AND ru_driver.status = 'driver'
         LEFT JOIN (
             SELECT ride_id, COUNT(*) AS messages_count
             FROM messages
             GROUP BY ride_id
         ) AS msg ON r.id = msg.ride_id
-        WHERE (r.created_at >= '{last_etl_run_date}' OR r.updated_at >= '{last_etl_run_date}' OR r.deleted_at >= '{last_etl_run_date}');
+        WHERE (r.created_at >= '{last_etl_run_date}' OR r.updated_at >= '{last_etl_run_date}' OR r.deleted_at >= '{last_etl_run_date}')
+        ORDER BY r.id;
         """
         rides_data = pd.read_sql(query_extract_rides, conn_oltp)
 
@@ -98,21 +98,12 @@ def etl_fact_ride(last_etl_run_date_str=None):
         rides_data['occurrence_date_sk'] = pd.to_datetime(rides_data['occurred_at']).dt.strftime('%Y%m%d').astype('Int64')
         rides_data['occurrence_hour_sk'] = pd.to_datetime(rides_data['occurred_at']).dt.strftime('%H%M').astype('Int64')
 
-        # Determinar se é carona de rotina
-        rides_data['is_routine_ride'] = (rides_data['repeats_until'].notna())
-
-        # Converter a coluna is_routine_ride para Python booleano (True/False)
-        rides_data['is_routine_ride'] = rides_data['is_routine_ride'].fillna(False).astype(bool)
-
-        # Tornar nulos os valores de 'routine_id' onde 'is_routine_ride' é falso
-        rides_data.loc[~rides_data['is_routine_ride'], 'routine_id'] = pd.NA
-
         # -------------------- FLAGS --------------------
 
         print("Derivando flags e buscando ride_flags_sk...")
 
-        # A coluna 'is_routine_ride' do OLTP, 'week_days', 'description' e 'done'
-        # são passadas para 'derive_and_lookup_flags' através do row_oltp.
+        # As colunas 'is_going_to_campus', 'done' e 'deleted_at' são passadas
+        # para 'derive_and_lookup_flags' através do row_oltp.
         rides_data['ride_flags_sk'] = rides_data.apply(derive_and_lookup_flags, axis=1)
         
         # Transformando a coluna em Int64
@@ -166,7 +157,7 @@ def etl_fact_ride(last_etl_run_date_str=None):
             'pending_requests_count': 0, 'accepted_requests_count': 0,
             'refused_requests_count': 0, 'quit_requests_count': 0,
             'requests_count': 0, 'messages_count': 0,
-            'is_going_to_campus': False, 'slots_count': 0, 'is_routine_ride': False,
+            'is_going_to_campus': False, 'slots_count': 0,
             'driver_creation_events_agg': 0
         }, inplace=True)
 
@@ -201,6 +192,26 @@ def etl_fact_ride(last_etl_run_date_str=None):
         rides_data['place_neighborhood_sk'].fillna(-1, inplace=True)
         rides_data['place_hub_sk'].fillna(-1, inplace=True)
 
+        # -------------------- ROUTINE --------------------
+
+        # Obter chave substituta da dim_routine
+        dim_routine_map = pd.read_sql("SELECT routine_id, routine_sk FROM dim_routine;", conn_dw)
+
+        # Convertendo routine_id para numérico
+        dim_routine_map['routine_id'] = pd.to_numeric(dim_routine_map['routine_id'], errors='coerce').astype('Int64')
+
+        # Fazendo o merge com dim_routine_map
+        rides_data = rides_data.merge(dim_routine_map, on='routine_id', how='left')
+
+        # Convertendo para Int64
+        rides_data['routine_sk'] = pd.to_numeric(rides_data['routine_sk'], errors='coerce').astype('Int64')
+
+        # Lógica de atribuição de routine_sk:
+        # - Caronas não-rotineiras (routine_id é None OU repeats_until é None) → routine_sk = 0 (Não Aplicável)
+        # - Caronas rotineiras sem mapeamento → routine_sk = -1 (Desconhecido)
+        rides_data.loc[rides_data['routine_id'].isna() | rides_data['repeats_until'].isna(), 'routine_sk'] = 0
+        rides_data['routine_sk'].fillna(-1, inplace=True)
+
         # -------------------- PLACE --------------------
 
         # Criar place_origin_sk e place_destination_sk baseado em is_going_to_campus
@@ -222,22 +233,20 @@ def etl_fact_ride(last_etl_run_date_str=None):
         # Tratamento de SKs nulas
         rides_data['place_origin_sk'].fillna(-1, inplace=True)
         rides_data['place_destination_sk'].fillna(-1, inplace=True)
-
-
-
+        
         # -------------------- FINAL --------------------
 
         # Limpar colunas temporárias e selecionar as finais
         final_fact_columns = [
-            'ride_id', 'routine_id',
-            'driver_user_sk', 'place_origin_sk', 'place_destination_sk', 'ride_flags_sk',
+            'ride_id',
+            'driver_user_sk', 'place_origin_sk', 'place_destination_sk', 'ride_flags_sk', 'routine_sk',
             'creation_date_sk', 'creation_hour_sk', 'occurrence_date_sk', 'occurrence_hour_sk',
             'slots_count', 'messages_count', 'requests_count', 'accepted_requests_count', 'refused_requests_count',
-            'pending_requests_count', 'quit_requests_count', 'repeats_until'
+            'pending_requests_count', 'quit_requests_count'
         ]
 
-        # Garantir que as colunas SK não são nulas se as FKs não são opcionais (refletir se deixamos assim, mas acho que sim porque já tem o -1 pros desconhecidos)
-        rides_data.dropna(subset=['driver_user_sk', 'place_origin_sk', 'place_destination_sk', 'ride_flags_sk',
+        # Garantir que as colunas SK não são nulas se as FKs não são opcionais
+        rides_data.dropna(subset=['driver_user_sk', 'place_origin_sk', 'place_destination_sk', 'ride_flags_sk', 'routine_sk',
                                   'creation_date_sk', 'creation_hour_sk', 'occurrence_date_sk', 'occurrence_hour_sk'], inplace=True)
         
         fact_data_to_load = rides_data[final_fact_columns]
@@ -248,25 +257,23 @@ def etl_fact_ride(last_etl_run_date_str=None):
         
         insert_or_update_query = """
         INSERT INTO fact_ride (
-            ride_id, routine_id,
-            driver_user_sk, place_origin_sk, place_destination_sk, ride_flags_sk,
+            ride_id,
+            driver_user_sk, place_origin_sk, place_destination_sk, ride_flags_sk, routine_sk,
             creation_date_sk, creation_hour_sk, occurrence_date_sk, occurrence_hour_sk,
             slots_count, messages_count, requests_count, accepted_requests_count, refused_requests_count,
-            pending_requests_count, quit_requests_count, repeats_until
+            pending_requests_count, quit_requests_count
         ) VALUES (
-            %(ride_id)s, %(routine_id)s,
-            %(driver_user_sk)s, %(place_origin_sk)s, %(place_destination_sk)s, %(ride_flags_sk)s,
+            %(ride_id)s,
+            %(driver_user_sk)s, %(place_origin_sk)s, %(place_destination_sk)s, %(ride_flags_sk)s, %(routine_sk)s,
             %(creation_date_sk)s, %(creation_hour_sk)s, %(occurrence_date_sk)s, %(occurrence_hour_sk)s,
             %(slots_count)s, %(messages_count)s, %(requests_count)s, %(accepted_requests_count)s, %(refused_requests_count)s,
-            %(pending_requests_count)s, %(quit_requests_count)s, %(repeats_until)s
+            %(pending_requests_count)s, %(quit_requests_count)s
         ) ON CONFLICT (ride_id) DO UPDATE SET
-            ride_id = EXCLUDED.ride_id,
-            routine_id = EXCLUDED.routine_id,
-
             driver_user_sk = EXCLUDED.driver_user_sk,
             place_origin_sk = EXCLUDED.place_origin_sk,
             place_destination_sk = EXCLUDED.place_destination_sk,
             ride_flags_sk = EXCLUDED.ride_flags_sk,
+            routine_sk = EXCLUDED.routine_sk,
 
             creation_date_sk = EXCLUDED.creation_date_sk,
             creation_hour_sk = EXCLUDED.creation_hour_sk,
@@ -279,8 +286,7 @@ def etl_fact_ride(last_etl_run_date_str=None):
             accepted_requests_count = EXCLUDED.accepted_requests_count,
             refused_requests_count = EXCLUDED.refused_requests_count,
             pending_requests_count = EXCLUDED.pending_requests_count,
-            quit_requests_count = EXCLUDED.quit_requests_count,
-            repeats_until = EXCLUDED.repeats_until
+            quit_requests_count = EXCLUDED.quit_requests_count
         """
         data_to_load_dicts = fact_data_to_load.to_dict(orient='records')
 

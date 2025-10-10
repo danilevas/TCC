@@ -3,6 +3,14 @@ from config import DB_DW, DB_OLTP
 from utils import connect_to_db
 from psycopg2.extras import execute_batch
 
+# Mapeamento de descrições para cada status
+STATUS_DESCRIPTIONS = {
+    'pending': 'Solicitação de entrada na carona ainda não respondida pelo motorista',
+    'accepted': 'Solicitação de entrada na carona aceita pelo motorista',
+    'refused': 'Solicitação de entrada na carona recusada pelo motorista',
+    'quit': 'Usuário requerente desistiu de entrar na carona'
+}
+
 def etl_dim_request_status():
     conn_oltp = connect_to_db(DB_OLTP)
     conn_dw = connect_to_db(DB_DW)
@@ -29,25 +37,30 @@ def etl_dim_request_status():
             cur.execute(extract_query)
             status_results = cur.fetchall()
 
-        # Converter resultados para lista de tuplas
-        status_names = [(row[0],) for row in status_results]
+        # Converter resultados para lista de tuplas com descrição
+        status_data = []
+        for row in status_results:
+            status_name = row[0]
+            status_description = STATUS_DESCRIPTIONS.get(status_name, f'Status: {status_name}')
+            status_data.append((status_name, status_description))
 
-        if not status_names:
+        if not status_data:
             print("Nenhum status encontrado no OLTP. Abortando carga.")
             return False
 
-        print(f"Status encontrados: {[s[0] for s in status_names]}")
+        print(f"Status encontrados: {[s[0] for s in status_data]}")
         print("Carregando dados na dim_request_status...")
 
         # Usar UPSERT para garantir que os status existam, mas não duplicar
         insert_or_update_query = """
-        INSERT INTO dim_request_status (status_name)
-        VALUES (%s)
-        ON CONFLICT (status_name) DO NOTHING;
+        INSERT INTO dim_request_status (status_name, status_description)
+        VALUES (%s, %s)
+        ON CONFLICT (status_name) DO UPDATE SET
+            status_description = EXCLUDED.status_description;
         """
 
         with conn_dw.cursor() as cur:
-            execute_batch(cur, insert_or_update_query, status_names)
+            execute_batch(cur, insert_or_update_query, status_data)
         conn_dw.commit()
         print("Carga da dim_request_status concluída.")
         return True

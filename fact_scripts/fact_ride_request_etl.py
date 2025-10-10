@@ -22,7 +22,7 @@ def etl_fact_ride_request(last_etl_run_date_str=None):
         # 1. Extração (Extract)
         query_extract_ride_users = f"""
         SELECT
-            id AS ride_user_id,
+            id AS request_id,
             ride_id,
             user_id,
             created_at,
@@ -30,7 +30,8 @@ def etl_fact_ride_request(last_etl_run_date_str=None):
             status
         FROM ride_user
         WHERE status <> 'driver' -- já tirando os pedidos de criação de carona
-        AND (created_at >= '{last_etl_run_date}' OR updated_at >= '{last_etl_run_date}');
+        AND (created_at >= '{last_etl_run_date}' OR updated_at >= '{last_etl_run_date}')
+        ORDER BY id;
         """
         requests_data = pd.read_sql(query_extract_ride_users, conn_oltp)
         print(f"Extraídas {len(requests_data)} interações de carona para processamento incremental.")
@@ -73,7 +74,7 @@ def etl_fact_ride_request(last_etl_run_date_str=None):
 
         # Limpar colunas temporárias e selecionar as finais
         final_fact_columns = [
-            'ride_user_id', 'ride_sk', 'user_sk', 'status_sk',
+            'request_id', 'ride_sk', 'user_sk', 'status_sk',
             'creation_date_sk', 'creation_hour_sk', 'update_date_sk', 'update_hour_sk'
         ]
 
@@ -91,16 +92,16 @@ def etl_fact_ride_request(last_etl_run_date_str=None):
 
         insert_or_update_query = """
         INSERT INTO fact_ride_request (
-            ride_user_id, ride_sk, user_sk, status_sk,
+            request_id, ride_sk, user_sk, status_sk,
             creation_date_sk, creation_hour_sk, update_date_sk, update_hour_sk
         ) VALUES (
-            %(ride_user_id)s, %(ride_sk)s, %(user_sk)s, %(status_sk)s,
+            %(request_id)s, %(ride_sk)s, %(user_sk)s, %(status_sk)s,
             %(creation_date_sk)s, %(creation_hour_sk)s, %(update_date_sk)s, %(update_hour_sk)s
-        ) ON CONFLICT (ride_user_id) DO UPDATE SET
+        ) ON CONFLICT (request_id) DO UPDATE SET
             ride_sk = EXCLUDED.ride_sk,
             user_sk = EXCLUDED.user_sk,
             status_sk = EXCLUDED.status_sk,
-            
+
             creation_date_sk = EXCLUDED.creation_date_sk,
             creation_hour_sk = EXCLUDED.creation_hour_sk,
 

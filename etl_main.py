@@ -14,6 +14,7 @@ from dim_scripts.dim_hour_etl import etl_dim_hour
 from dim_scripts.dim_user_etl import etl_dim_user
 from dim_scripts.dim_place_etl import etl_dim_place
 from dim_scripts.dim_request_status_etl import etl_dim_request_status
+from dim_scripts.dim_routine_etl import etl_dim_routine
 from dim_scripts.dim_ride_flags_etl import etl_dim_ride_flags
 
 from fact_scripts.fact_ride_etl import etl_fact_ride
@@ -174,20 +175,20 @@ def insert_all_unknown_dim_members(conn_dw):
     # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_request_status em sql_queries.py
     dim_request_status_unknown_values = {
         'status_sk': -1,
-        'status_name': 'Desconhecido'
+        'status_name': 'Desconhecido',
+        'status_description': 'Status desconhecido ou não identificado'
     }
     if not insert_unknown_dim_member(conn_dw, 'dim_request_status', ['status_sk'], dim_request_status_unknown_values):
         print("Falha ao inserir membro 'Desconhecido' para dim_request_status.")
         return False
 
-    # --- dim_ride_flags ---
-    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_ride_flags em sql_queries.py
-    dim_ride_flags_unknown_values = {
-        'ride_flags_sk': -1,
-        'is_routine_ride': False,
-        'is_going_to_campus': False,
-        'done': False,
-        'deleted': False,
+    # --- dim_routine ---
+    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_routine em sql_queries.py
+    # Membro "Não Aplicável" (caronas não-rotineiras)
+    dim_routine_not_applicable_values = {
+        'routine_sk': 0,
+        'routine_id': 0,
+        'repeats_until': None,
         'is_routine_monday': False,
         'is_routine_tuesday': False,
         'is_routine_wednesday': False,
@@ -195,6 +196,37 @@ def insert_all_unknown_dim_members(conn_dw):
         'is_routine_friday': False,
         'is_routine_saturday': False,
         'is_routine_sunday': False,
+        'routine_days_description': 'Não Aplicável'
+    }
+    if not insert_unknown_dim_member(conn_dw, 'dim_routine', ['routine_sk'], dim_routine_not_applicable_values):
+        print("Falha ao inserir membro 'Não Aplicável' para dim_routine.")
+        return False
+
+    # Membro "Desconhecido" (erro/dado faltante)
+    dim_routine_unknown_values = {
+        'routine_sk': -1,
+        'routine_id': -1,
+        'repeats_until': None,
+        'is_routine_monday': False,
+        'is_routine_tuesday': False,
+        'is_routine_wednesday': False,
+        'is_routine_thursday': False,
+        'is_routine_friday': False,
+        'is_routine_saturday': False,
+        'is_routine_sunday': False,
+        'routine_days_description': 'Desconhecido'
+    }
+    if not insert_unknown_dim_member(conn_dw, 'dim_routine', ['routine_sk'], dim_routine_unknown_values):
+        print("Falha ao inserir membro 'Desconhecido' para dim_routine.")
+        return False
+
+    # --- dim_ride_flags ---
+    # IMPORTANTE: Alinhe estas colunas e valores EXATAMENTE com a sua DDL de dim_ride_flags em sql_queries.py
+    dim_ride_flags_unknown_values = {
+        'ride_flags_sk': -1,
+        'is_going_to_campus': False,
+        'done': False,
+        'deleted': False,
         'flags_description': 'Desconhecido',
     }
     if not insert_unknown_dim_member(conn_dw, 'dim_ride_flags', ['ride_flags_sk'], dim_ride_flags_unknown_values):
@@ -255,13 +287,15 @@ def main_etl_process(carga_completa):
         # As dimensões temporais geralmente só precisam ser carregadas uma vez ou quando estender o período
         etl_dim_date()
         etl_dim_hour()
-        
-        # A dim_ride_flags só precisa ser carregada uma vez
-        etl_dim_ride_flags()
-        
+
         if not etl_dim_user(): print("ETL DimUser falhou.")
         if not etl_dim_place(): print("ETL DimPlace falhou.")
         if not etl_dim_request_status(): print("ETL DimRequestStatus falhou.")
+        if not etl_dim_routine(): print("ETL DimRoutine falhou.")
+
+        # A dim_ride_flags só precisa ser carregada uma vez
+        etl_dim_ride_flags()
+
         print("\n---------- ETL das Dimensões Concluído ----------")
 
         # 4. Executar ETL dos Fatos (Carga Incremental)

@@ -72,18 +72,17 @@ CREATE TABLE IF NOT EXISTS dim_place (
 CREATE_DIM_REQUEST_STATUS_TABLE = """
 CREATE TABLE IF NOT EXISTS dim_request_status (
     status_sk SERIAL PRIMARY KEY,
-    status_name VARCHAR(50) UNIQUE NOT NULL
+    status_name VARCHAR(50) UNIQUE NOT NULL,
+    status_description VARCHAR(255)
 );
 """
 
 # Dimensão sucata
-CREATE_DIM_RIDE_FLAGS_TABLE = """
-CREATE TABLE IF NOT EXISTS dim_ride_flags (
-    ride_flags_sk SERIAL PRIMARY KEY,
-    is_routine_ride BOOLEAN NOT NULL,
-    is_going_to_campus BOOLEAN NOT NULL,
-    done BOOLEAN NOT NULL,
-    deleted BOOLEAN NOT NULL,
+CREATE_DIM_ROUTINE_TABLE = """
+CREATE TABLE IF NOT EXISTS dim_routine (
+    routine_sk SERIAL PRIMARY KEY,
+    routine_id INT UNIQUE,
+    repeats_until TIMESTAMP,
     is_routine_monday BOOLEAN NOT NULL,
     is_routine_tuesday BOOLEAN NOT NULL,
     is_routine_wednesday BOOLEAN NOT NULL,
@@ -91,6 +90,16 @@ CREATE TABLE IF NOT EXISTS dim_ride_flags (
     is_routine_friday BOOLEAN NOT NULL,
     is_routine_saturday BOOLEAN NOT NULL,
     is_routine_sunday BOOLEAN NOT NULL,
+    routine_days_description VARCHAR(255)
+);
+"""
+
+CREATE_DIM_RIDE_FLAGS_TABLE = """
+CREATE TABLE IF NOT EXISTS dim_ride_flags (
+    ride_flags_sk SERIAL PRIMARY KEY,
+    is_going_to_campus BOOLEAN NOT NULL,
+    done BOOLEAN NOT NULL,
+    deleted BOOLEAN NOT NULL,
     flags_description VARCHAR(255) UNIQUE -- Para facilitar a visualização e garantir unicidade da combinação textual
 );
 """
@@ -100,13 +109,13 @@ CREATE_FACT_RIDE_TABLE = """
 CREATE TABLE IF NOT EXISTS fact_ride (
     ride_sk SERIAL PRIMARY KEY, -- Chave primária para o fato
     ride_id INT UNIQUE NOT NULL,
-    routine_id INT, -- Pensar se deixa mesmo aqui
 
     -- SKs
     driver_user_sk INT NOT NULL,
     place_origin_sk INT NOT NULL,
     place_destination_sk INT NOT NULL,
     ride_flags_sk INT NOT NULL,
+    routine_sk INT NOT NULL,
 
     -- SKs para o momento de CRIAÇÃO da carona
     creation_date_sk INT NOT NULL,
@@ -124,13 +133,12 @@ CREATE TABLE IF NOT EXISTS fact_ride (
     pending_requests_count INT DEFAULT 0,
     quit_requests_count INT DEFAULT 0,
 
-    repeats_until TIMESTAMP, -- Rotina
-
     -- FKs
     FOREIGN KEY (driver_user_sk) REFERENCES dim_user(user_sk),
     FOREIGN KEY (place_origin_sk) REFERENCES dim_place(place_sk),
     FOREIGN KEY (place_destination_sk) REFERENCES dim_place(place_sk),
     FOREIGN KEY (ride_flags_sk) REFERENCES dim_ride_flags(ride_flags_sk),
+    FOREIGN KEY (routine_sk) REFERENCES dim_routine(routine_sk),
 
     -- FKs para as dimensões de tempo
     FOREIGN KEY (creation_date_sk) REFERENCES dim_date(date_sk),
@@ -143,7 +151,7 @@ CREATE TABLE IF NOT EXISTS fact_ride (
 CREATE_FACT_RIDE_REQUEST_TABLE = """
 CREATE TABLE IF NOT EXISTS fact_ride_request (
     request_pk SERIAL PRIMARY KEY, -- Chave primária para o fato
-    ride_user_id INT UNIQUE NOT NULL, -- Chave de negócio original da ride_user
+    request_id INT UNIQUE NOT NULL, -- Chave de negócio original da ride_user
 
     ride_sk INT NOT NULL, -- ID da carona a que se refere (FK para fact_ride.ride_sk)
     user_sk INT NOT NULL, -- Usuário que fez a interação (motorista ou caronista)
@@ -161,7 +169,7 @@ CREATE TABLE IF NOT EXISTS fact_ride_request (
     FOREIGN KEY (ride_sk) REFERENCES fact_ride(ride_sk),
     FOREIGN KEY (user_sk) REFERENCES dim_user(user_sk),
     FOREIGN KEY (status_sk) REFERENCES dim_request_status(status_sk),
-    
+
     -- FKs para as dimensões de tempo
     FOREIGN KEY (creation_date_sk) REFERENCES dim_date(date_sk),
     FOREIGN KEY (creation_hour_sk) REFERENCES dim_hour(hour_sk),
@@ -178,17 +186,19 @@ DROP_DIM_HOUR_TABLE = "DROP TABLE IF EXISTS dim_hour CASCADE;"
 DROP_DIM_USER_TABLE = "DROP TABLE IF EXISTS dim_user CASCADE;"
 DROP_DIM_PLACE_TABLE = "DROP TABLE IF EXISTS dim_place CASCADE;"
 DROP_DIM_REQUEST_STATUS_TABLE = "DROP TABLE IF EXISTS dim_request_status CASCADE;"
+DROP_DIM_ROUTINE_TABLE = "DROP TABLE IF EXISTS dim_routine CASCADE;"
 DROP_DIM_RIDE_FLAGS_TABLE = "DROP TABLE IF EXISTS dim_ride_flags CASCADE;"
 
 ALL_DDL_DROP_QUERIES = [
-    DROP_FACT_RIDE_TABLE,
     DROP_FACT_RIDE_REQUEST_TABLE,
-    DROP_DIM_DATE_TABLE,
-    DROP_DIM_HOUR_TABLE,
-    DROP_DIM_USER_TABLE,
-    DROP_DIM_PLACE_TABLE,
+    DROP_FACT_RIDE_TABLE,
+    DROP_DIM_RIDE_FLAGS_TABLE,
+    DROP_DIM_ROUTINE_TABLE,
     DROP_DIM_REQUEST_STATUS_TABLE,
-    DROP_DIM_RIDE_FLAGS_TABLE
+    DROP_DIM_PLACE_TABLE,
+    DROP_DIM_USER_TABLE,
+    DROP_DIM_HOUR_TABLE,
+    DROP_DIM_DATE_TABLE
 ]
 
 ALL_DDL_CREATE_QUERIES = [
@@ -197,6 +207,7 @@ ALL_DDL_CREATE_QUERIES = [
     CREATE_DIM_USER_TABLE,
     CREATE_DIM_PLACE_TABLE,
     CREATE_DIM_REQUEST_STATUS_TABLE,
+    CREATE_DIM_ROUTINE_TABLE,
     CREATE_DIM_RIDE_FLAGS_TABLE,
     CREATE_FACT_RIDE_TABLE,
     CREATE_FACT_RIDE_REQUEST_TABLE

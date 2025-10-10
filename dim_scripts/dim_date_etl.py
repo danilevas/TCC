@@ -13,9 +13,9 @@ def etl_dim_date():
     try:
         print("\n--- DIM_DATE ---")
 
-        # Gerar datas para um período razoável (ex: 2016 a 2030)
+        # Gerar datas para um período razoável (ex: 2016 a 2035)
         start_date = datetime(2016, 4, 1)
-        end_date = datetime(2030, 12, 31)
+        end_date = datetime(2035, 12, 31)
         
         dates = pd.date_range(start=start_date, end=end_date, freq='D')
         
