@@ -34,7 +34,8 @@ def etl_dim_user():
             u.updated_at,
             u.deleted_at
         FROM users u
-        LEFT JOIN institutions i ON u.institution_id = i.id;
+        LEFT JOIN institutions i ON u.institution_id = i.id
+        ORDER BY u.id;
         """
         users_data = pd.read_sql(query_extract_users, conn_oltp)
         print(f"Extraídos {len(users_data)} usuários.")

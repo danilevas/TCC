@@ -26,7 +26,8 @@ def etl_dim_place():
             i.name AS institution_name
         FROM hubs h
         LEFT JOIN campi c ON h.campus_id = c.id
-        LEFT JOIN institutions i ON c.institution_id = i.id;
+        LEFT JOIN institutions i ON c.institution_id = i.id
+        ORDER BY h.id;
         """
         hubs_data = pd.read_sql(query_extract_hubs, conn_oltp)
         print(f"Extraídos {len(hubs_data)} pólos.")

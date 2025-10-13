@@ -21,7 +21,7 @@ LEFT JOIN rides r1
 USING (id)
 WHERE r1.id IS NULL;
 
-# Para checar as origens e destinos
+-- Para checar as origens e destinos
 
 -- Enable extension (once per DB)
 CREATE EXTENSION IF NOT EXISTS dblink;
