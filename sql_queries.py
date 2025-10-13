@@ -77,7 +77,6 @@ CREATE TABLE IF NOT EXISTS dim_request_status (
 );
 """
 
-# Dimensão sucata
 CREATE_DIM_ROUTINE_TABLE = """
 CREATE TABLE IF NOT EXISTS dim_routine (
     routine_sk SERIAL PRIMARY KEY,
@@ -94,6 +93,7 @@ CREATE TABLE IF NOT EXISTS dim_routine (
 );
 """
 
+# Dimensão sucata
 CREATE_DIM_RIDE_FLAGS_TABLE = """
 CREATE TABLE IF NOT EXISTS dim_ride_flags (
     ride_flags_sk SERIAL PRIMARY KEY,

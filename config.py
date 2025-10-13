@@ -3,7 +3,7 @@
 # Configurações para o banco de dados OLTP (origem)
 DB_OLTP = {
     'host': 'localhost',
-    'database': 'caronae_oltp', # Nome do seu banco de dados transacional Caronaê
+    'database': 'caronae_oltp_2020', # Estou pegando os dados mais atualizados!
     'user': 'postgres',
     'password': 'mcpostgresnosanos80',
     'port': '5432'
