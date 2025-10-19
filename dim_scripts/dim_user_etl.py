@@ -21,8 +21,6 @@ def etl_dim_user():
             u.id AS user_id,
             u.profile AS academic_affiliation,
             u.course,
-            u.phone_number,
-            u.email,
             u.car_owner AS has_car,
             u.car_model,
             u.app_platform,
@@ -57,21 +55,19 @@ def etl_dim_user():
         insert_or_update_query = """
         INSERT INTO dim_user (
             user_id, academic_affiliation, course, 
-            phone_number, email, has_car,
+            has_car,
             car_model, app_platform, app_version,
             is_banned, institution_id, institution_name,
             created_at, updated_at, deleted_at
         ) VALUES (
             %(user_id)s, %(academic_affiliation)s, %(course)s,
-            %(phone_number)s, %(email)s, %(has_car)s,
+            %(has_car)s,
             %(car_model)s, %(app_platform)s, %(app_version)s,
             %(is_banned)s, %(institution_id)s, %(institution_name)s,
             %(created_at)s, %(updated_at)s, %(deleted_at)s
         ) ON CONFLICT (user_id) DO UPDATE SET
             academic_affiliation = EXCLUDED.academic_affiliation,
             course = EXCLUDED.course,
-            phone_number = EXCLUDED.phone_number,
-            email = EXCLUDED.email,
             has_car = EXCLUDED.has_car,
             car_model = EXCLUDED.car_model,
             app_platform = EXCLUDED.app_platform,

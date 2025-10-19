@@ -133,8 +133,6 @@ def insert_all_unknown_dim_members(conn_dw):
         'user_id': -1,
         'academic_affiliation': 'Desconhecido',
         'course': 'Desconhecido',
-        'phone_number': 'Desconhecido',
-        'email': 'Desconhecido',
         'has_car': False,
         'car_model': 'Desconhecido',
 

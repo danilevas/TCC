@@ -35,8 +35,6 @@ CREATE TABLE IF NOT EXISTS dim_user (
     user_id INT UNIQUE NOT NULL, -- Chave de negócio original
     academic_affiliation VARCHAR(50),
     course VARCHAR(100),
-    phone_number VARCHAR(100),
-    email VARCHAR(255),
     has_car BOOLEAN NOT NULL,
     car_model VARCHAR(100),
     app_platform VARCHAR(255),
@@ -108,7 +106,7 @@ CREATE TABLE IF NOT EXISTS dim_ride_flags (
 CREATE_FACT_RIDE_TABLE = """
 CREATE TABLE IF NOT EXISTS fact_ride (
     ride_sk SERIAL PRIMARY KEY, -- Chave primária para o fato
-    ride_id INT UNIQUE NOT NULL,
+    ride_id INT UNIQUE NOT NULL, -- Dimensão degenerada
 
     -- SKs
     driver_user_sk INT NOT NULL,
@@ -151,7 +149,7 @@ CREATE TABLE IF NOT EXISTS fact_ride (
 CREATE_FACT_RIDE_REQUEST_TABLE = """
 CREATE TABLE IF NOT EXISTS fact_ride_request (
     request_pk SERIAL PRIMARY KEY, -- Chave primária para o fato
-    request_id INT UNIQUE NOT NULL, -- Chave de negócio original da ride_user
+    request_id INT UNIQUE NOT NULL, -- Dimensão degenerada
 
     ride_sk INT NOT NULL, -- ID da carona a que se refere (FK para fact_ride.ride_sk)
     user_sk INT NOT NULL, -- Usuário que fez a interação (motorista ou caronista)
