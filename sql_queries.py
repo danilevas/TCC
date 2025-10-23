@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS dim_ride_flags (
 );
 """
     
-# DDLs para as tabelas de fatos
+# DDLs para as tabelas fato
 CREATE_FACT_RIDE_TABLE = """
 CREATE TABLE IF NOT EXISTS fact_ride (
     ride_sk SERIAL PRIMARY KEY, -- Chave primária para o fato

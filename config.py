@@ -12,7 +12,7 @@ DB_OLTP = {
 # Configurações para o banco de dados DW (destino)
 DB_DW = {
     'host': 'localhost',
-    'database': 'caronae_dw',    # Nome do seu novo banco de dados Data Warehouse
+    'database': 'caronae_dw', # Nome do Data Warehouse
     'user': 'postgres',
     'password': 'mcpostgresnosanos80',
     'port': '5432'

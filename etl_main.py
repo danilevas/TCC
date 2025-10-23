@@ -40,36 +40,43 @@ def set_last_etl_run_date(dt):
     with open(LAST_RUN_FILE, 'w') as f:
         f.write(dt.strftime("%Y-%m-%d %H:%M:%S.%f"))
 
-def create_dw_tables(conn_dw):
+def create_dw_tables(conn_dw, drop_existing=True):
     """
-    Dropa todas as tabelas existentes no DW e as recria.
-    Isso garante um ambiente limpo para cada execução completa do ETL.
+    Gerencia as tabelas do Data Warehouse.
+
+    Se drop_existing=True: Dropa todas as tabelas existentes e as recria (carga completa).
+    Se drop_existing=False: Apenas cria tabelas se não existirem (carga incremental).
+
     Retorna True em caso de sucesso, False em caso de falha.
     """
-    print("Verificando e recriando tabelas do Data Warehouse...")
+    if drop_existing:
+        print("Recriando tabelas do Data Warehouse (DROP + CREATE)...")
+    else:
+        print("Verificando e criando tabelas do Data Warehouse (se necessário)...")
 
     # Retorna as queries de DDL baseado na configuração requisitada para as duas tabelas pré-populadas
     DROP_QUERIES, CREATE_QUERIES = get_queries()
-    
+
     try:
         cur = conn_dw.cursor()
 
-        # --- PASSO 1: DROPAR TODAS AS TABELAS (para garantir um estado limpo) ---
-        print("Dropping existing tables (if any)...")
-        # Itera sobre as queries de DROP em ordem inversa de dependência (definida em sql_queries.py)
-        for query in DROP_QUERIES:
-            try:
-                cur.execute(query)
-                conn_dw.commit() # Commita cada DROP para que as dependências sejam liberadas
-                print(f"  - Query DROP executada com sucesso: {query.splitlines()[0].strip()}...")
-            except Exception as e:
-                conn_dw.rollback() # Em caso de erro, desfaz a transação atual
-                # Avisa, mas continua, pois a tabela pode não existir na primeira execução
-                print(f"  - Aviso: Erro ao dropar tabela (pode não existir): {e}. Query: {query.splitlines()[0].strip()}...")
-        print("Finished dropping tables.")
+        # --- PASSO 1: DROPAR TODAS AS TABELAS (apenas se drop_existing=True) ---
+        if drop_existing:
+            print("Dropping existing tables (if any)...")
+            # Itera sobre as queries de DROP em ordem inversa de dependência (definida em sql_queries.py)
+            for query in DROP_QUERIES:
+                try:
+                    cur.execute(query)
+                    conn_dw.commit() # Commita cada DROP para que as dependências sejam liberadas
+                    print(f"  - Query DROP executada com sucesso: {query.splitlines()[0].strip()}...")
+                except Exception as e:
+                    conn_dw.rollback() # Em caso de erro, desfaz a transação atual
+                    # Avisa, mas continua, pois a tabela pode não existir na primeira execução
+                    print(f"  - Aviso: Erro ao dropar tabela (pode não existir): {e}. Query: {query.splitlines()[0].strip()}...")
+            print("Finished dropping tables.")
 
-        # --- PASSO 2: CRIAR TODAS AS TABELAS ---
-        print("Creating new tables...")
+        # --- PASSO 2: CRIAR TODAS AS TABELAS (sempre executa, usando IF NOT EXISTS) ---
+        print("Creating tables (if not exist)...")
         # Itera sobre as queries de CREATE (definida em sql_queries.py)
         for query in CREATE_QUERIES:
             try:
@@ -261,8 +268,10 @@ def main_etl_process(carga_completa):
 
         print("Conexões com os bancos de dados estabelecidas com sucesso.")
 
-        # 1. Criar/Recriar tabelas do DW (Drop e Create)
-        if not create_dw_tables(conn_dw):
+        # 1. Criar/Recriar tabelas do DW
+        # Em carga completa: DROP + CREATE (fresh start)
+        # Em carga incremental: apenas CREATE IF NOT EXISTS (preserva dados)
+        if not create_dw_tables(conn_dw, drop_existing=carga_completa):
             print("ETL abortado devido a falha na criação/recriação das tabelas do DW.")
             return # Sai da função se as tabelas não puderem ser criadas
 
