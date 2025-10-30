@@ -91,3 +91,33 @@ WHERE drf.done = TRUE
 AND drs.status_name = 'accepted'
 GROUP BY du.academic_affiliation
 ORDER BY passageiros_impactados DESC
+
+-- Passageiros impactados por período
+SELECT 
+	dd.period,
+	du.user_sk,
+	du.academic_affiliation
+FROM fact_ride_request frr
+JOIN fact_ride fr ON frr.ride_sk = fr.ride_sk
+JOIN dim_ride_flags drf ON fr.ride_flags_sk = drf.ride_flags_sk
+JOIN dim_request_status drs ON frr.status_sk = drs.status_sk
+JOIN dim_date dd ON fr.occurrence_date_sk = dd.date_sk
+JOIN dim_user du ON frr.user_sk = du.user_sk
+WHERE drf.done = TRUE
+AND drs.status_name = 'accepted'
+
+UNION
+
+-- Motoristas impactados por período
+SELECT 
+	dd.period,
+	du.user_sk,
+	du.academic_affiliation
+FROM fact_ride fr
+JOIN dim_ride_flags drf ON fr.ride_flags_sk = drf.ride_flags_sk
+JOIN dim_date dd ON fr.occurrence_date_sk = dd.date_sk
+JOIN dim_user du ON fr.driver_user_sk = du.user_sk
+WHERE drf.done = TRUE
+AND fr.accepted_requests_count > 0
+
+ORDER BY user_sk, period
