@@ -13,22 +13,49 @@ def etl_dim_date():
     try:
         print("\n--- DIM_DATE ---")
 
+        # Mapeamento de dias da semana em inglês para português
+        day_names_pt = {
+            'Monday': 'Segunda-feira',
+            'Tuesday': 'Terça-feira',
+            'Wednesday': 'Quarta-feira',
+            'Thursday': 'Quinta-feira',
+            'Friday': 'Sexta-feira',
+            'Saturday': 'Sábado',
+            'Sunday': 'Domingo'
+        }
+
+        # Mapeamento de meses em inglês para português
+        month_names_pt = {
+            'January': 'Janeiro',
+            'February': 'Fevereiro',
+            'March': 'Março',
+            'April': 'Abril',
+            'May': 'Maio',
+            'June': 'Junho',
+            'July': 'Julho',
+            'August': 'Agosto',
+            'September': 'Setembro',
+            'October': 'Outubro',
+            'November': 'Novembro',
+            'December': 'Dezembro'
+        }
+
         # Gerar datas para um período razoável (ex: 2016 a 2035)
         start_date = datetime(2016, 4, 1)
         end_date = datetime(2035, 12, 31)
-        
+
         dates = pd.date_range(start=start_date, end=end_date, freq='D')
-        
+
         data_to_load = []
         for dt in dates:
             # Gerar dados para a parte de data
             date_sk = int(dt.strftime('%Y%m%d'))
             full_date = dt.date()
             day_of_week = dt.isoweekday() # 1=Monday, 7=Sunday
-            day_name = dt.strftime('%A')
+            day_name = day_names_pt[dt.strftime('%A')]  # Traduzido para português
             day_of_month = dt.day
             month = dt.month
-            month_name = dt.strftime('%B')
+            month_name = month_names_pt[dt.strftime('%B')]  # Traduzido para português
             semester = (dt.month - 1) // 6 + 1
             period = f"{dt.year}.{(dt.month - 1) // 7 + 1}"
             year = dt.year
