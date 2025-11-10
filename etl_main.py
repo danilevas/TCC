@@ -143,9 +143,6 @@ def insert_all_unknown_dim_members(conn_dw):
         'has_car': False,
         'car_model': 'Desconhecido',
 
-        'app_platform': 'Desconhecido',
-        'app_version': 'Desconhecido',
-
         'is_banned': False,
         'institution_id': -1,
         'institution_name': 'Desconhecido',

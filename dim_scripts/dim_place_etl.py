@@ -52,6 +52,36 @@ def etl_dim_place():
         # Concatenando os DataFrames
         place_data = pd.concat([hubs_data, neighborhoods_data], ignore_index=True)
 
+        # Mapeamento de renomeação de zonas
+        zone_names_mapping = {
+            "Zona Sul": "Zona Sul (Rio)",
+            "Zona Norte": "Zona Norte (Rio)",
+            "Zona Oeste": "Zona Oeste (Rio)",
+            "Centro": "Centro do Rio",
+            "Baixada": "Baixada Fluminense"
+        }
+
+        # Mapeamento de renomeação de centros
+        center_names_mapping = {
+            "CCMN": "CCMN (Fundão)",
+            "CT": "CT (Fundão)",
+            "CCS": "CCS (Fundão)",
+            "EEFD": "EEFD (Fundão)",
+            "Letras": "Letras (Fundão)",
+            "Reitoria": "Reitoria (Fundão)",
+            "Praia Vermelha": "Praia Vermelha",
+            "Polo Universitário": "Polo Universitário (Macaé)",
+            "Polo Ajuda": "Polo Ajuda (Macaé)",
+            "Polo NUPEM": "Polo NUPEM (Macaé)",
+            "Hospital Escola": "Hospital Escola (Macaé)"
+        }
+
+        # Renomear as zonas de acordo com o mapeamento
+        place_data['zone_name'] = place_data['zone_name'].replace(zone_names_mapping)
+
+        # Renomear os centros de acordo com o mapeamento
+        place_data['center'] = place_data['center'].replace(center_names_mapping)
+
         # Convertendo as colunas numéricas
         colunas_numericas = ['hub_id', 'campus_id', 'institution_id', 'neighborhood_id', 'zone_id']
         for coluna in colunas_numericas:

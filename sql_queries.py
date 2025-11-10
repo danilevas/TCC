@@ -37,8 +37,6 @@ CREATE TABLE IF NOT EXISTS dim_user (
     course VARCHAR(100),
     has_car BOOLEAN NOT NULL,
     car_model VARCHAR(100),
-    app_platform VARCHAR(255),
-    app_version VARCHAR(255),
     is_banned BOOLEAN NOT NULL,
     institution_id INT NOT NULL,    
     institution_name VARCHAR(255),

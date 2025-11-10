@@ -5,3 +5,4 @@ __pycache__
 dim_scripts/__pycache__
 fact_scripts/__pycache__
 testes/__pycache__
+last_etl_run.txt

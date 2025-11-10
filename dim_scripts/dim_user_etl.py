@@ -23,8 +23,6 @@ def etl_dim_user():
             u.course,
             u.car_owner AS has_car,
             u.car_model,
-            u.app_platform,
-            u.app_version,
             u.banned AS is_banned,
             i.id AS institution_id,
             i.name AS institution_name,
@@ -42,7 +40,13 @@ def etl_dim_user():
 
         # Tratar valores nulos ou inconsistências (ex: car_model se has_car é falso)
         users_data['car_model'] = users_data.apply(lambda row: row['car_model'] if row['has_car'] else None, axis=1)
-        
+
+        # Primeiro, normalizar strings vazias na coluna course para NaN
+        users_data['course'] = users_data['course'].replace('', pd.NA)
+
+        # Preencher course nulo com "Desconhecido" (agora pega NULL e ex-strings vazias)
+        users_data['course'] = users_data['course'].fillna('Desconhecido')
+
         # Garantir que strings vazias ou NaN sejam None para NULL no banco
         users_data = users_data.replace({pd.NA: None, '': None})
 
@@ -56,13 +60,13 @@ def etl_dim_user():
         INSERT INTO dim_user (
             user_id, academic_affiliation, course, 
             has_car,
-            car_model, app_platform, app_version,
+            car_model,
             is_banned, institution_id, institution_name,
             created_at, updated_at, deleted_at
         ) VALUES (
             %(user_id)s, %(academic_affiliation)s, %(course)s,
             %(has_car)s,
-            %(car_model)s, %(app_platform)s, %(app_version)s,
+            %(car_model)s,
             %(is_banned)s, %(institution_id)s, %(institution_name)s,
             %(created_at)s, %(updated_at)s, %(deleted_at)s
         ) ON CONFLICT (user_id) DO UPDATE SET
@@ -70,8 +74,6 @@ def etl_dim_user():
             course = EXCLUDED.course,
             has_car = EXCLUDED.has_car,
             car_model = EXCLUDED.car_model,
-            app_platform = EXCLUDED.app_platform,
-            app_version = EXCLUDED.app_version,
             is_banned = EXCLUDED.is_banned,
             institution_id = EXCLUDED.institution_id,
             institution_name = EXCLUDED.institution_name,
