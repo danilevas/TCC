@@ -40,7 +40,7 @@ def etl_fact_ride_request(last_etl_run_date_str=None):
             print("Nenhum dado novo ou atualizado para processar na fact_ride_request.")
             return True
 
-        # 2. Transformação (Transform)
+        # -------------------- SKs de Data e Hora --------------------
 
         # Gerar chaves de data/hora a partir da data e hora em que o pedido foi criado (da coluna created_at)
         requests_data['creation_date_sk'] = pd.to_datetime(requests_data['created_at']).dt.strftime('%Y%m%d').astype('Int64')
