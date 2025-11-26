@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat pyproject.toml)",
+      "Bash(cat sql_queries.py)",
+      "Bash(cat utils.py)",
+      "Bash(cat check_csv_diff.py)",
+      "Bash(cat check_sql_diff.py)",
+      "Bash(cat dim_scripts/dim_place_etl.py)",
+      "Bash(cat dim_scripts/dim_date_etl.py)",
+      "Bash(cat fact_scripts/fact_ride_etl.py)",
+      "Bash(cat fact_scripts/fact_ride_request_etl.py)",
+      "Bash(cat _outros/SQLs/consultas/ativos_e_impactados.sql)",
+      "Bash(cat dim_scripts/dim_routine_etl.py)",
+      "Bash(cat dim_scripts/dim_request_status_etl.py)",
+      "Bash(cat dim_scripts/dim_ride_flags_etl.py)",
+      "Bash(cat dim_scripts/dim_hour_etl.py)",
+      "Bash(cat last_etl_run.txt)",
+      "Bash(cat .gitignore)",
+      "Bash(cat testes/teste_data_hora.py)",
+      "Bash(cat _outros/SQLs/consultas/consultas_2025.sql)",
+      "Bash(cat .python-version)",
+      "Bash(ls:*)",
+      "Bash(cat:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
