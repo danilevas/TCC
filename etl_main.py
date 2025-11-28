@@ -40,7 +40,7 @@ def set_last_etl_run_date(dt):
     with open(LAST_RUN_FILE, 'w') as f:
         f.write(dt.strftime("%Y-%m-%d %H:%M:%S.%f"))
 
-def create_dw_tables(conn_dw, clear_data=True):
+def create_or_reset_dw_tables(conn_dw, clear_data=True):
     """
     Gerencia as tabelas do Data Warehouse.
 
@@ -271,7 +271,7 @@ def main_etl_process(carga_completa):
         # 1. Criar/Verificar tabelas do DW e limpar dados se necessário
         # Em carga completa: TRUNCATE (limpa dados, preserva estrutura)
         # Em carga incremental: apenas CREATE IF NOT EXISTS (preserva dados)
-        if not create_dw_tables(conn_dw, clear_data=carga_completa):
+        if not create_or_reset_dw_tables(conn_dw, clear_data=carga_completa):
             print("ETL abortado devido a falha na preparação das tabelas do DW.")
             return # Sai da função se as tabelas não puderem ser criadas
 
